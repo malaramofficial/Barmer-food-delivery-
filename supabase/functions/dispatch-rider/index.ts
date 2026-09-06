@@ -1,21 +1,21 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-const cors={ 'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization, x-client-info, apikey, content-type' };
+const cors={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization, x-client-info, apikey, content-type'};
 const json=(b:unknown,s=200)=>new Response(JSON.stringify(b),{status:s,headers:{...cors,'Content-Type':'application/json'}});
 Deno.serve(async req=>{
- if(req.method==='OPTIONS')return new Response('ok',{headers:cors});
- if(req.method!=='POST')return json({error:'Method not allowed'},405);
+ if(req.method==='OPTIONS')return new Response('ok',{headers:cors}); if(req.method!=='POST')return json({error:'Method not allowed'},405);
  const admin=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
  const auth=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_ANON_KEY')!,{global:{headers:{Authorization:req.headers.get('Authorization')??''}}});
  const {data:{user}}=await auth.auth.getUser(); if(!user)return json({error:'Authentication required'},401);
  const {data:profile}=await admin.from('profiles').select('role').eq('id',user.id).single(); if(profile?.role!=='admin')return json({error:'Admin only'},403);
  const body=await req.json().catch(()=>null); if(!body?.order_id||body.lat==null||body.lng==null)return json({error:'order_id, lat and lng are required'},400);
- const {data:riders,error}=await admin.from('rider_locations').select('rider_id,latitude,longitude,updated_at').eq('is_online',true).limit(200);
+ const cutoff=new Date(Date.now()-2*60*1000).toISOString();
+ const {data:riders,error}=await admin.from('rider_locations').select('rider_id,latitude,longitude,updated_at').gte('updated_at',cutoff).limit(200);
  if(error)return json({error:error.message},500);
- const distance=(a:number,b:number,c:number,d:number)=>{const R=6371,rad=Math.PI/180;const x=(c-a)*rad,y=(d-b)*rad;const q=Math.sin(x/2)**2+Math.cos(a*rad)*Math.cos(c*rad)*Math.sin(y/2)**2;return 2*R*Math.asin(Math.sqrt(q));};
+ const distance=(a:number,b:number,c:number,d:number)=>{const R=6371,rad=Math.PI/180,x=(c-a)*rad,y=(d-b)*rad,q=Math.sin(x/2)**2+Math.cos(a*rad)*Math.cos(c*rad)*Math.sin(y/2)**2;return 2*R*Math.asin(Math.sqrt(q));};
  const candidates=(riders??[]).map((r:any)=>({...r,km:distance(Number(body.lat),Number(body.lng),Number(r.latitude),Number(r.longitude))})).filter(r=>r.km<=15).sort((a,b)=>a.km-b.km);
  const selected=candidates[0]; if(!selected)return json({error:'No nearby online rider available'},409);
  const {error:updateError}=await admin.from('orders').update({rider_id:selected.rider_id,status:'rider_assigned'}).eq('id',body.order_id).in('status',['ready_for_pickup','restaurant_notified','accepted','preparing']);
  if(updateError)return json({error:updateError.message},500);
- await admin.from('notifications').insert({user_id:selected.rider_id,type:'order',title:'नया delivery order',body:`Order ${body.order_id} आपके पास है`,data:{order_id:body.order_id}});
+ await admin.from('notifications').insert({user_id:selected.rider_id,order_id:body.order_id,title:'नया delivery order',body:`Order ${body.order_id} आपके पास है`});
  return json({order_id:body.order_id,rider_id:selected.rider_id,distance_km:Number(selected.km.toFixed(2))});
 });
