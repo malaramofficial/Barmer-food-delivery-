@@ -1,0 +1,97 @@
+-- Barmer Food Delivery production schema
+create extension if not exists pgcrypto;
+
+do $$ begin create type public.app_role as enum ('customer','restaurant','rider','admin'); exception when duplicate_object then null; end $$;
+do $$ begin create type public.application_status as enum ('pending','approved','rejected','suspended'); exception when duplicate_object then null; end $$;
+do $$ begin create type public.order_status as enum ('placed','restaurant_notified','accepted','preparing','ready_for_pickup','rider_assigned','picked_up','on_the_way','delivered','cancelled'); exception when duplicate_object then null; end $$;
+
+create table if not exists public.profiles(
+ id uuid primary key references auth.users(id) on delete cascade,
+ full_name text not null,
+ phone text unique,
+ role public.app_role not null default 'customer',
+ avatar_url text,
+ address text,
+ created_at timestamptz not null default now(),
+ updated_at timestamptz not null default now()
+);
+create table if not exists public.restaurant_applications(
+ id uuid primary key default gen_random_uuid(), applicant_id uuid references auth.users(id) on delete set null,
+ restaurant_name text not null, owner_name text not null, phone text not null,
+ address text not null, barmer_area text not null, registration_no text,
+ status public.application_status not null default 'pending', admin_note text,
+ created_at timestamptz not null default now(), reviewed_at timestamptz
+);
+create table if not exists public.rider_applications(
+ id uuid primary key default gen_random_uuid(), applicant_id uuid references auth.users(id) on delete set null,
+ full_name text not null, phone text not null, address text not null, vehicle_no text,
+ licence_no text, emergency_contact text, status public.application_status not null default 'pending', admin_note text,
+ created_at timestamptz not null default now(), reviewed_at timestamptz
+);
+create table if not exists public.restaurants(
+ id uuid primary key default gen_random_uuid(), owner_id uuid references auth.users(id) on delete set null,
+ name text not null, cuisine text, address text not null, area text not null, phone text,
+ rating numeric(2,1) default 0, delivery_fee numeric(10,2) default 0, is_open boolean default false,
+ is_approved boolean not null default false, latitude double precision, longitude double precision,
+ created_at timestamptz not null default now()
+);
+create table if not exists public.menu_categories(id uuid primary key default gen_random_uuid(), restaurant_id uuid not null references public.restaurants(id) on delete cascade, name text not null, sort_order int default 0);
+create table if not exists public.menu_items(id uuid primary key default gen_random_uuid(), restaurant_id uuid not null references public.restaurants(id) on delete cascade, category_id uuid references public.menu_categories(id) on delete set null, name text not null, description text, price numeric(10,2) not null, image_url text, is_available boolean default true);
+create table if not exists public.orders(
+ id uuid primary key default gen_random_uuid(), customer_id uuid not null references auth.users(id) on delete restrict,
+ restaurant_id uuid not null references public.restaurants(id) on delete restrict, rider_id uuid references auth.users(id) on delete set null,
+ status public.order_status not null default 'placed', delivery_address text not null,
+ delivery_latitude double precision, delivery_longitude double precision, subtotal numeric(10,2) not null,
+ delivery_fee numeric(10,2) not null default 0, total numeric(10,2) not null, payment_method text not null default 'cod',
+ created_at timestamptz not null default now(), accepted_at timestamptz, picked_up_at timestamptz, delivered_at timestamptz
+);
+create table if not exists public.order_items(
+ id uuid primary key default gen_random_uuid(), order_id uuid not null references public.orders(id) on delete cascade,
+ menu_item_id uuid references public.menu_items(id) on delete set null, item_name text not null, quantity int not null check(quantity>0), unit_price numeric(10,2) not null
+);
+create table if not exists public.rider_locations(
+ rider_id uuid primary key references auth.users(id) on delete cascade, latitude double precision not null, longitude double precision not null,
+ accuracy_m double precision, heading double precision, updated_at timestamptz not null default now()
+);
+create table if not exists public.notifications(
+ id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users(id) on delete cascade,
+ order_id uuid references public.orders(id) on delete cascade, title text not null, body text not null, read_at timestamptz,
+ created_at timestamptz not null default now()
+);
+create table if not exists public.reviews(
+ id uuid primary key default gen_random_uuid(), order_id uuid unique not null references public.orders(id) on delete cascade,
+ customer_id uuid not null references auth.users(id) on delete cascade, restaurant_id uuid not null references public.restaurants(id) on delete cascade,
+ rating int not null check(rating between 1 and 5), comment text, created_at timestamptz not null default now()
+);
+
+alter table public.profiles enable row level security;
+alter table public.restaurant_applications enable row level security;
+alter table public.rider_applications enable row level security;
+alter table public.restaurants enable row level security;
+alter table public.menu_categories enable row level security;
+alter table public.menu_items enable row level security;
+alter table public.orders enable row level security;
+alter table public.order_items enable row level security;
+alter table public.rider_locations enable row level security;
+alter table public.notifications enable row level security;
+alter table public.reviews enable row level security;
+
+-- Basic customer-facing policies. Admin/service-role operations must be server-side.
+create policy "public approved restaurants" on public.restaurants for select using (is_approved = true);
+create policy "public menus of approved restaurants" on public.menu_items for select using (exists(select 1 from public.restaurants r where r.id=restaurant_id and r.is_approved=true));
+create policy "public menu categories of approved restaurants" on public.menu_categories for select using (exists(select 1 from public.restaurants r where r.id=restaurant_id and r.is_approved=true));
+create policy "users read own profile" on public.profiles for select using (auth.uid()=id);
+create policy "users update own profile" on public.profiles for update using (auth.uid()=id);
+create policy "users create restaurant application" on public.restaurant_applications for insert with check (auth.uid()=applicant_id);
+create policy "users read own restaurant application" on public.restaurant_applications for select using (auth.uid()=applicant_id);
+create policy "users create rider application" on public.rider_applications for insert with check (auth.uid()=applicant_id);
+create policy "users read own rider application" on public.rider_applications for select using (auth.uid()=applicant_id);
+create policy "customers read own orders" on public.orders for select using (auth.uid()=customer_id or auth.uid()=rider_id);
+create policy "customers create own orders" on public.orders for insert with check (auth.uid()=customer_id);
+create policy "customers read own order items" on public.order_items for select using (exists(select 1 from public.orders o where o.id=order_id and (o.customer_id=auth.uid() or o.rider_id=auth.uid())));
+create policy "users read own notifications" on public.notifications for select using (auth.uid()=user_id);
+create policy "customers read own reviews" on public.reviews for select using (auth.uid()=customer_id);
+create policy "customers create own reviews" on public.reviews for insert with check (auth.uid()=customer_id);
+
+-- Barmer service-area guard: application/backend must geocode and validate the address/coordinates.
+-- Never trust a client-provided role, approval flag, rider assignment or admin decision.
