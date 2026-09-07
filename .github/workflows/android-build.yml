@@ -41,11 +41,18 @@ jobs:
       - name: Build release APK and AAB
         working-directory: android
         run: gradle --no-daemon assembleRelease bundleRelease -PSUPABASE_URL="$SUPABASE_URL" -PSUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" -PMAPS_API_KEY="$MAPS_API_KEY" -PGOOGLE_WEB_CLIENT_ID="$GOOGLE_WEB_CLIENT_ID"
-      - name: Upload Android artifacts
+      - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: barmer-food-delivery-android
-          path: |
-            android/app/build/outputs/apk/debug/*.apk
-            android/app/build/outputs/apk/release/*.apk
-            android/app/build/outputs/bundle/release/*.aab
+          name: barmer-food-delivery-v2-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+      - name: Upload release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: barmer-food-delivery-v2-release-apk
+          path: android/app/build/outputs/apk/release/*.apk
+      - name: Upload Play Store AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: barmer-food-delivery-v2-release-aab
+          path: android/app/build/outputs/bundle/release/*.aab
