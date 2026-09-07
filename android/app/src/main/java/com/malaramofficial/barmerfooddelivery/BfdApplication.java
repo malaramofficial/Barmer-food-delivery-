@@ -2,6 +2,7 @@ package com.malaramofficial.barmerfooddelivery;
 
 import android.app.Activity;
 import android.app.Application;
+import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
@@ -11,12 +12,12 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
-/** Adds the Google one-tap action to the existing native login screen without WebView. */
+/** Adds native authentication shortcuts to the existing customer login screen. */
 public final class BfdApplication extends Application {
     @Override public void onCreate() {
         super.onCreate();
         registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {
-            @Override public void onActivityResumed(Activity activity) { attachGoogle(activity); }
+            @Override public void onActivityResumed(Activity activity) { attachAuthActions(activity); }
             @Override public void onActivityCreated(Activity a, Bundle b) {}
             @Override public void onActivityStarted(Activity a) {}
             @Override public void onActivityPaused(Activity a) {}
@@ -26,50 +27,47 @@ public final class BfdApplication extends Application {
         });
     }
 
-    private void attachGoogle(Activity activity) {
+    private void attachAuthActions(Activity activity) {
         if (!(activity instanceof MainActivity)) return;
         View welcome = findText(activity.getWindow().getDecorView(), "Welcome back 👋");
-        if (!(welcome instanceof TextView)) return;
-        if (!(welcome.getParent() instanceof LinearLayout)) return;
+        if (!(welcome instanceof TextView) || !(welcome.getParent() instanceof LinearLayout)) return;
         LinearLayout parent = (LinearLayout) welcome.getParent();
-        if (findGoogleButton(parent)) return;
+        if (!findButton(parent, "Google")) addGoogle(activity, parent, welcome);
+        if (!findButton(parent, "Admin / Staff Login")) addAdmin(activity, parent);
+    }
+
+    private void addGoogle(Activity activity, LinearLayout parent, View welcome) {
         Button google = new Button(activity);
         google.setText("G  Continue with Google");
-        google.setTextSize(16);
-        google.setAllCaps(false);
-        google.setTextColor(Color.DKGRAY);
-        google.setMinHeight(dp(activity, 52));
-        google.setBackground(round(Color.WHITE, dp(activity, 12)));
-        google.setElevation(dp(activity, 2));
+        google.setTextSize(16); google.setAllCaps(false); google.setTextColor(Color.DKGRAY);
+        google.setMinHeight(dp(activity, 52)); google.setBackground(round(Color.WHITE, dp(activity, 12))); google.setElevation(dp(activity, 2));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, dp(activity, 52));
-        lp.setMargins(0, dp(activity, 4), 0, dp(activity, 10));
-        google.setLayoutParams(lp);
+        lp.setMargins(0, dp(activity, 4), 0, dp(activity, 10)); google.setLayoutParams(lp);
         google.setOnClickListener(v -> {
             google.setEnabled(false);
-            NativeApi api = new NativeApi(activity);
-            new GoogleAuth(activity).signIn(activity, api, new GoogleAuth.Callback() {
-                @Override public void ok() {
-                    activity.runOnUiThread(() -> {
-                        Toast.makeText(activity, "Google से sign-in सफल", Toast.LENGTH_SHORT).show();
-                        activity.recreate();
-                    });
-                }
-                @Override public void error(String message) {
-                    activity.runOnUiThread(() -> {
-                        google.setEnabled(true);
-                        Toast.makeText(activity, message, Toast.LENGTH_LONG).show();
-                    });
-                }
+            new GoogleAuth(activity).signIn(activity, new NativeApi(activity), new GoogleAuth.Callback() {
+                @Override public void ok() { activity.runOnUiThread(() -> { Toast.makeText(activity, "Google से sign-in सफल", Toast.LENGTH_SHORT).show(); activity.recreate(); }); }
+                @Override public void error(String message) { activity.runOnUiThread(() -> { google.setEnabled(true); Toast.makeText(activity, message, Toast.LENGTH_LONG).show(); }); }
             });
         });
         int index = parent.indexOfChild(welcome) + 1;
         parent.addView(google, index);
     }
 
-    private boolean findGoogleButton(LinearLayout parent) {
+    private void addAdmin(Activity activity, LinearLayout parent) {
+        TextView admin = new TextView(activity);
+        admin.setText("Admin / Staff Login"); admin.setTextSize(13); admin.setTextColor(Color.rgb(95,95,100));
+        admin.setGravity(android.view.Gravity.CENTER); admin.setPadding(0, dp(activity, 12), 0, dp(activity, 12));
+        admin.setContentDescription("Admin / Staff Login");
+        admin.setOnClickListener(v -> activity.startActivity(new Intent(activity, AdminActivity.class)));
+        parent.addView(admin);
+    }
+
+    private boolean findButton(LinearLayout parent, String text) {
         for (int i = 0; i < parent.getChildCount(); i++) {
             View v = parent.getChildAt(i);
-            if (v instanceof Button && ((Button) v).getText().toString().contains("Google")) return true;
+            if (v instanceof Button && ((Button) v).getText().toString().contains(text)) return true;
+            if (v instanceof TextView && ((TextView) v).getText().toString().contains(text)) return true;
         }
         return false;
     }
