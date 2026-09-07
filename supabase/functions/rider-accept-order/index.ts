@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const cors={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization, x-client-info, apikey, content-type'};
 const json=(b:unknown,s=200)=>new Response(JSON.stringify(b),{status:s,headers:{...cors,'Content-Type':'application/json'}});
+const distanceKm=(a:number,b:number,c:number,d:number)=>{const R=6371,rad=Math.PI/180,x=(c-a)*rad,y=(d-b)*rad,q=Math.sin(x/2)**2+Math.cos(a*rad)*Math.cos(c*rad)*Math.sin(y/2)**2;return 2*R*Math.asin(Math.sqrt(q));};
 Deno.serve(async req=>{
  if(req.method==='OPTIONS')return new Response('ok',{headers:cors});
  if(req.method!=='POST')return json({error:'Method not allowed'},405);
@@ -10,11 +11,18 @@ Deno.serve(async req=>{
  const body=await req.json().catch(()=>null); if(!body?.order_id)return json({error:'order_id is required'},400);
  const {data:p}=await service.from('profiles').select('role').eq('id',user.id).single(); if(p?.role!=='rider')return json({error:'Approved rider only'},403);
  const {data:a}=await service.from('rider_applications').select('id').eq('applicant_id',user.id).eq('status','approved').limit(1); if(!a?.length)return json({error:'Rider approval required'},403);
- const {data:loc}=await service.from('rider_locations').select('is_online,updated_at').eq('rider_id',user.id).maybeSingle(); if(!loc?.is_online||Date.now()-new Date(loc.updated_at).getTime()>2*60*1000)return json({error:'Go online with a fresh GPS location first'},409);
- const {data:updated,error}=await service.from('orders').update({rider_id:user.id,status:'rider_assigned'}).eq('id',body.order_id).eq('status','ready_for_pickup').is('rider_id',null).select('id,status,rider_id,customer_id,restaurant_id,total,delivery_fee').single();
+ const {data:loc}=await service.from('rider_locations').select('latitude,longitude,is_online,updated_at').eq('rider_id',user.id).maybeSingle();
+ if(!loc?.is_online||Date.now()-new Date(loc.updated_at).getTime()>2*60*1000)return json({error:'Go online with a fresh GPS location first'},409);
+ const {data:order}=await service.from('orders').select('id,status,rider_id,customer_id,restaurant_id,total,delivery_fee').eq('id',body.order_id).maybeSingle();
+ if(!order)return json({error:'Order not found'},404);
+ if(order.status!=='ready_for_pickup'||order.rider_id)return json({error:'This delivery is no longer available'},409);
+ const {data:r}=await service.from('restaurants').select('owner_id,name,latitude,longitude,is_approved').eq('id',order.restaurant_id).maybeSingle();
+ if(!r?.is_approved||!Number.isFinite(Number(r.latitude))||!Number.isFinite(Number(r.longitude)))return json({error:'Restaurant pickup location is not configured'},409);
+ const km=distanceKm(Number(r.latitude),Number(r.longitude),Number(loc.latitude),Number(loc.longitude));
+ if(km>15)return json({error:'You are outside the 15 km pickup radius'},403);
+ const {data:updated,error}=await service.from('orders').update({rider_id:user.id,status:'rider_assigned'}).eq('id',order.id).eq('status','ready_for_pickup').is('rider_id',null).select('id,status,rider_id,customer_id,restaurant_id,total,delivery_fee').maybeSingle();
  if(error||!updated)return json({error:'This delivery is no longer available'},409);
- const {data:r}=await service.from('restaurants').select('owner_id,name').eq('id',updated.restaurant_id).single();
  const recipients=[updated.customer_id,r?.owner_id].filter(Boolean).filter((id)=>id!==user.id);
  if(recipients.length)await service.from('notifications').insert([...new Set(recipients)].map((user_id)=>({user_id,order_id:updated.id,type:'order',title:'Rider assigned',body:'आपका rider delivery के लिए assign हो गया है।',data:{status:'rider_assigned',rider_id:user.id}})));
- return json({ok:true,order:updated,restaurant:r?.name??null});
+ return json({ok:true,order:updated,restaurant:r?.name??null,distance_km:Number(km.toFixed(2))});
 });
