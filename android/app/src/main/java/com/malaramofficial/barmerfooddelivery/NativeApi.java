@@ -68,6 +68,14 @@ public final class NativeApi {
         }, true);
     }
 
+    /** Adapter kept separate so GoogleAuth can expose its simple native callback. */
+    public void signInWithIdToken(JSONObject body, GoogleAuth.Callback cb) {
+        request("POST", "/auth/v1/token?grant_type=id_token", body, false, new Callback() {
+            public void ok(JSONObject d) { saveSession(d); cb.ok(); }
+            public void error(String m) { cb.error(m); }
+        }, true);
+    }
+
     private void saveSession(JSONObject d) {
         try {
             JSONObject u = d.optJSONObject("user");
