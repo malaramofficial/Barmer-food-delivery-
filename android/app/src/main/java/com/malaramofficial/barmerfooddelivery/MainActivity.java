@@ -1,266 +1,29 @@
 package com.malaramofficial.barmerfooddelivery;
 
-import android.Manifest;
-import android.app.Activity;
-import android.content.Intent;
-import android.content.pm.PackageManager;
-import android.graphics.Color;
-import android.location.Location;
-import android.os.Bundle;
-import android.provider.Settings;
-import android.view.Gravity;
-import android.view.View;
-import android.widget.Button;
-import android.widget.HorizontalScrollView;
-import android.widget.LinearLayout;
-import android.widget.ScrollView;
-import android.widget.TextView;
-import android.widget.Toast;
+import android.Manifest;import android.app.*;import android.content.*;import android.content.pm.PackageManager;import android.graphics.Color;import android.location.*;import android.net.Uri;import android.os.Bundle;import android.widget.*;import org.json.*;import java.util.*;
 
-import java.util.ArrayList;
-import java.util.List;
-
-/**
- * Native Android entry point. No WebView and no browser-hosted UI.
- * The feature screens are native Android Views and are ready to be connected
- * to the existing Supabase backend through NativeApi.
- */
-public class MainActivity extends Activity {
-    private static final int LOCATION_REQUEST = 1001;
-    private LinearLayout root;
-    private final List<String> cart = new ArrayList<>();
-
-    @Override public void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        showHome();
-    }
-
-    private int dp(int value) {
-        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
-    }
-
-    private TextView text(String value, float size, int color) {
-        TextView t = new TextView(this);
-        t.setText(value);
-        t.setTextSize(size);
-        t.setTextColor(color);
-        t.setPadding(dp(16), dp(10), dp(16), dp(10));
-        return t;
-    }
-
-    private Button button(String label) {
-        Button b = new Button(this);
-        b.setText(label);
-        b.setAllCaps(false);
-        b.setMinHeight(dp(48));
-        return b;
-    }
-
-    private LinearLayout column() {
-        LinearLayout l = new LinearLayout(this);
-        l.setOrientation(LinearLayout.VERTICAL);
-        l.setPadding(dp(12), dp(12), dp(12), dp(16));
-        return l;
-    }
-
-    private void base(String title) {
-        root = column();
-        root.setBackgroundColor(Color.WHITE);
-        LinearLayout bar = new LinearLayout(this);
-        bar.setGravity(Gravity.CENTER_VERTICAL);
-        TextView t = text(title, 22, Color.rgb(30, 30, 30));
-        t.setTypeface(null, android.graphics.Typeface.BOLD);
-        bar.addView(t, new LinearLayout.LayoutParams(0, dp(64), 1));
-        Button profile = button("Profile");
-        profile.setOnClickListener(v -> showProfile());
-        bar.addView(profile, new LinearLayout.LayoutParams(dp(100), dp(56)));
-        root.addView(bar);
-        setContentView(root);
-    }
-
-    private void showHome() {
-        base("Barmer Food Delivery");
-        TextView welcome = text("बारमेर में खाना अब आपके दरवाज़े तक", 18, Color.DKGRAY);
-        root.addView(welcome);
-
-        Button location = button("📍 Delivery location सेट करें");
-        location.setOnClickListener(v -> requestLocation());
-        root.addView(location);
-
-        root.addView(text("Categories", 18, Color.BLACK));
-        HorizontalScrollView hsv = new HorizontalScrollView(this);
-        LinearLayout cats = new LinearLayout(this);
-        cats.setOrientation(LinearLayout.HORIZONTAL);
-        String[] categories = {"🍛 All", "🍕 Pizza", "🍔 Burger", "🥘 Rajasthani", "🍗 Biryani", "☕ Cafe"};
-        for (String c : categories) {
-            Button b = button(c);
-            b.setOnClickListener(v -> showRestaurants(c));
-            cats.addView(b, new LinearLayout.LayoutParams(dp(125), dp(56)));
-        }
-        hsv.addView(cats);
-        root.addView(hsv);
-
-        root.addView(text("Approved restaurants & hotels", 18, Color.BLACK));
-        addRestaurantCard("Barmer Food Corner", "North Indian • 25–35 min", "₹₹", "🍛");
-        addRestaurantCard("Marwar Rasoi", "Rajasthani • 30–40 min", "₹₹", "🥘");
-        addRestaurantCard("Desert Cafe", "Cafe & Snacks • 15–25 min", "₹", "☕");
-
-        Button orders = button("📦 My Orders");
-        orders.setOnClickListener(v -> showOrders());
-        root.addView(orders);
-
-        Button partner = button("Careers / Partner with us");
-        partner.setOnClickListener(v -> showPartner());
-        root.addView(partner);
-    }
-
-    private void addRestaurantCard(String name, String details, String price, String emoji) {
-        LinearLayout card = column();
-        card.setBackgroundColor(Color.rgb(248, 248, 248));
-        TextView title = text(emoji + "  " + name, 19, Color.BLACK);
-        title.setTypeface(null, android.graphics.Typeface.BOLD);
-        card.addView(title);
-        card.addView(text(details + "   " + price, 14, Color.DKGRAY));
-        Button menu = button("View Menu");
-        menu.setOnClickListener(v -> showMenu(name));
-        card.addView(menu);
-        root.addView(card, new LinearLayout.LayoutParams(-1, LinearLayout.LayoutParams.WRAP_CONTENT));
-    }
-
-    private void showRestaurants(String category) {
-        base(category + " Restaurants");
-        addRestaurantCard("Barmer Food Corner", "Approved • Fast delivery", "₹₹", "🍛");
-        addRestaurantCard("Marwar Rasoi", "Approved • Rajasthani", "₹₹", "🥘");
-        addRestaurantCard("Desert Cafe", "Approved • Snacks", "₹", "☕");
-        Button back = button("← Home");
-        back.setOnClickListener(v -> showHome());
-        root.addView(back);
-    }
-
-    private void showMenu(String restaurant) {
-        base(restaurant);
-        root.addView(text("Menu", 20, Color.BLACK));
-        addFood("Dal Baati Churma", "₹180");
-        addFood("Paneer Thali", "₹220");
-        addFood("Masala Dosa", "₹120");
-        addFood("Cold Drink", "₹50");
-        Button cartButton = button("🛒 Cart (" + cart.size() + ")");
-        cartButton.setOnClickListener(v -> showCart());
-        root.addView(cartButton);
-    }
-
-    private void addFood(String name, String price) {
-        LinearLayout row = new LinearLayout(this);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        TextView t = text(name + "\n" + price, 16, Color.DKGRAY);
-        row.addView(t, new LinearLayout.LayoutParams(0, dp(70), 1));
-        Button add = button("+ Add");
-        add.setOnClickListener(v -> {
-            cart.add(name);
-            Toast.makeText(this, name + " cart में जोड़ा गया", Toast.LENGTH_SHORT).show();
-        });
-        row.addView(add, new LinearLayout.LayoutParams(dp(95), dp(55)));
-        root.addView(row);
-    }
-
-    private void showCart() {
-        base("Your Cart");
-        if (cart.isEmpty()) root.addView(text("Cart खाली है", 18, Color.GRAY));
-        else {
-            for (String item : cart) root.addView(text("• " + item, 16, Color.DKGRAY));
-            Button checkout = button("Proceed to Checkout • COD");
-            checkout.setOnClickListener(v -> showCheckout());
-            root.addView(checkout);
-        }
-        Button home = button("← Continue Shopping");
-        home.setOnClickListener(v -> showHome());
-        root.addView(home);
-    }
-
-    private void showCheckout() {
-        base("Checkout");
-        root.addView(text("Delivery address", 18, Color.BLACK));
-        root.addView(text("आपका चुना हुआ delivery location यहाँ दिखेगा", 15, Color.DKGRAY));
-        Button loc = button("📍 Use current location");
-        loc.setOnClickListener(v -> requestLocation());
-        root.addView(loc);
-        root.addView(text("Payment: Cash on Delivery", 16, Color.DKGRAY));
-        Button place = button("Place Order");
-        place.setOnClickListener(v -> {
-            cart.clear();
-            Toast.makeText(this, "Order placed — backend connection required for live dispatch", Toast.LENGTH_LONG).show();
-            showOrders();
-        });
-        root.addView(place);
-    }
-
-    private void showOrders() {
-        base("My Orders");
-        root.addView(text("No active orders", 18, Color.GRAY));
-        Button tracking = button("Open Live Tracking");
-        tracking.setOnClickListener(v -> showTracking());
-        root.addView(tracking);
-        Button home = button("← Home");
-        home.setOnClickListener(v -> showHome());
-        root.addView(home);
-    }
-
-    private void showTracking() {
-        base("Live Order Tracking");
-        root.addView(text("🟢 Restaurant → Rider → You", 19, Color.BLACK));
-        root.addView(text("Native map/tracking service will use GPS + backend realtime data.", 15, Color.DKGRAY));
-        Button maps = button("Open device Maps");
-        maps.setOnClickListener(v -> {
-            try { startActivity(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)); }
-            catch (Exception ignored) { }
-        });
-        root.addView(maps);
-    }
-
-    private void showPartner() {
-        base("Partner with Barmer Food Delivery");
-        root.addView(text("Choose your role", 20, Color.BLACK));
-        Button restaurant = button("🏨 Restaurant / Hotel Partner");
-        restaurant.setOnClickListener(v -> showApplication("Restaurant / Hotel Partner"));
-        root.addView(restaurant);
-        Button rider = button("🛵 Delivery Rider");
-        rider.setOnClickListener(v -> showApplication("Delivery Rider"));
-        root.addView(rider);
-        root.addView(text("Approval, KYC और service-area checks admin द्वारा होंगे.", 14, Color.GRAY));
-    }
-
-    private void showApplication(String role) {
-        base(role);
-        root.addView(text("Native application form", 20, Color.BLACK));
-        root.addView(text("नाम, मोबाइल, पता, KYC/vehicle details और आवश्यक documents backend में सुरक्षित रूप से submit होंगे.", 15, Color.DKGRAY));
-        Button submit = button("Submit Application");
-        submit.setOnClickListener(v -> Toast.makeText(this, "Login/backend integration required", Toast.LENGTH_LONG).show());
-        root.addView(submit);
-    }
-
-    private void showProfile() {
-        base("Profile");
-        root.addView(text("Customer Account", 20, Color.BLACK));
-        Button login = button("Login / Sign up");
-        login.setOnClickListener(v -> Toast.makeText(this, "Native authentication screen", Toast.LENGTH_SHORT).show());
-        root.addView(login);
-        Button partner = button("Careers / Partner with us");
-        partner.setOnClickListener(v -> showPartner());
-        root.addView(partner);
-    }
-
-    private void requestLocation() {
-        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION}, LOCATION_REQUEST);
-        } else {
-            Toast.makeText(this, "GPS permission उपलब्ध है", Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    @Override public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] results) {
-        super.onRequestPermissionsResult(requestCode, permissions, results);
-        if (requestCode == LOCATION_REQUEST) {
-            Toast.makeText(this, results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED ? "Location enabled" : "Location permission denied", Toast.LENGTH_SHORT).show();
-        }
-    }
+/** Native customer application. No WebView/browser UI. */
+public class MainActivity extends Activity{
+ private static final int LOC=1001;private NativeApi api;private LinearLayout root;private final ArrayList<JSONObject> cart=new ArrayList<>();private String restaurantId="",restaurantName="";private double lat,lng;
+ @Override public void onCreate(Bundle b){super.onCreate(b);api=new NativeApi(this);showHome();}
+ private int dp(int n){return(int)(n*getResources().getDisplayMetrics().density+.5f);}private TextView t(String s,float z){TextView v=new TextView(this);v.setText(s);v.setTextSize(z);v.setTextColor(Color.DKGRAY);v.setPadding(dp(14),dp(9),dp(14),dp(9));return v;}private Button btn(String s){Button b=new Button(this);b.setText(s);b.setAllCaps(false);b.setMinHeight(dp(48));return b;}
+ private void base(String title){root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setPadding(dp(10),dp(8),dp(10),dp(12));root.setBackgroundColor(Color.WHITE);LinearLayout bar=new LinearLayout(this);TextView h=t(title,21);h.setTypeface(null,1);bar.addView(h,new LinearLayout.LayoutParams(0,dp(58),1));Button p=btn("Profile");p.setOnClickListener(v->showProfile());bar.addView(p,new LinearLayout.LayoutParams(dp(105),dp(55)));root.addView(bar);ScrollView sc=new ScrollView(this);sc.addView(root);setContentView(sc);}
+ private void add(android.view.View v){root.addView(v,new LinearLayout.LayoutParams(-1,-2));}
+ private void showHome(){base("Barmer Food Delivery");add(t("🍽️ बारमेर में खाना आपके दरवाज़े तक",18));Button l=btn("📍 Delivery location सेट करें");l.setOnClickListener(v->requestLocation());add(l);add(t("Approved restaurants & hotels",18));loadRestaurants();Button o=btn("📦 My Orders");o.setOnClickListener(v->showOrders());add(o);Button n=btn("🔔 Notifications");n.setOnClickListener(v->showNotifications());add(n);Button p=btn("Careers / Partner with us");p.setOnClickListener(v->showPartner());add(p);}
+ private void loadRestaurants(){if(!api.configured()){add(t("Backend configure नहीं है. Android build में Supabase URL/key जोड़ें.",15));return;}api.restaurants(new NativeApi.Callback(){public void ok(JSONObject r){runOnUiThread(()->{try{JSONArray a=r.optJSONArray("data");if(a==null||a.length()==0){add(t("अभी कोई approved restaurant उपलब्ध नहीं है.",15));return;}for(int i=0;i<a.length();i++){JSONObject x=a.getJSONObject(i);LinearLayout card=new LinearLayout(MainActivity.this);card.setOrientation(LinearLayout.VERTICAL);card.setPadding(dp(8),dp(8),dp(8),dp(8));TextView h=t("🍛 "+x.optString("name"),18);h.setTypeface(null,1);card.addView(h);card.addView(t(x.optString("cuisine","Food")+" • "+x.optString("area","Barmer")+" • ₹"+x.optDouble("delivery_fee",0),14));Button m=btn(x.optBoolean("is_open")?"View Menu":"Closed");m.setEnabled(x.optBoolean("is_open"));m.setOnClickListener(v->showMenu(x));card.addView(m);root.addView(card);} }catch(Exception e){add(t("Restaurant data error: "+e.getMessage(),14));}});}public void error(String m){runOnUiThread(()->add(t("Restaurants: "+m,14)));}});}
+ private void showMenu(JSONObject r){restaurantId=r.optString("id");restaurantName=r.optString("name");cart.clear();base(restaurantName);add(t("Menu • "+r.optString("cuisine","Food"),18));api.menu(restaurantId,new NativeApi.Callback(){public void ok(JSONObject z){runOnUiThread(()->{try{JSONArray a=z.optJSONArray("data");if(a==null||a.length()==0){add(t("Menu उपलब्ध नहीं है.",15));return;}for(int i=0;i<a.length();i++){JSONObject x=a.getJSONObject(i);LinearLayout row=new LinearLayout(MainActivity.this);TextView q=t(x.optString("name")+"\n₹"+x.optDouble("price",0)+"\n"+x.optString("description",""),15);row.addView(q,new LinearLayout.LayoutParams(0,dp(82),1));Button ad=btn("+ Add");ad.setOnClickListener(v->{cart.add(x);Toast.makeText(MainActivity.this,"Cart में जोड़ा",Toast.LENGTH_SHORT).show();});row.addView(ad,new LinearLayout.LayoutParams(dp(95),dp(60)));root.addView(row);}Button c=btn("🛒 Cart ("+cart.size()+")");c.setOnClickListener(v->showCart());add(c);}catch(Exception e){add(t(e.getMessage(),14));}});}public void error(String m){runOnUiThread(()->add(t("Menu: "+m,14)));}});}
+ private void showCart(){base("Your Cart");if(cart.isEmpty()){add(t("Cart खाली है",18));return;}double total=0;for(JSONObject x:cart){double p=x.optDouble("price",0);total+=p;add(t("• "+x.optString("name")+" — ₹"+p,16));}add(t("Subtotal: ₹"+total,18));Button c=btn("Proceed to Checkout • COD");c.setOnClickListener(v->showCheckout());add(c);}
+ private void showCheckout(){base("Checkout");add(t("Restaurant: "+restaurantName,17));EditText address=new EditText(this);address.setHint("पूरा delivery address");add(address);Button l=btn("📍 Use current GPS location");l.setOnClickListener(v->requestLocation());add(l);add(t("Payment: Cash on Delivery",16));Button place=btn("Place Order");place.setOnClickListener(v->{if(!api.signedIn()){showLogin();return;}if(address.getText().toString().trim().length()<5){address.setError("पूरा address लिखें");return;}if(lat==0||lng==0){Toast.makeText(this,"पहले GPS location सेट करें",Toast.LENGTH_LONG).show();return;}try{JSONArray items=new JSONArray();for(JSONObject x:cart){JSONObject q=new JSONObject();q.put("menu_item_id",x.optString("id"));q.put("quantity",1);items.put(q);}place.setEnabled(false);api.createOrder(restaurantId,address.getText().toString().trim(),lat,lng,"cod",items,new NativeApi.Callback(){public void ok(JSONObject d){runOnUiThread(()->{cart.clear();Toast.makeText(MainActivity.this,"Order सफलतापूर्वक भेज दिया गया",Toast.LENGTH_LONG).show();showOrders();});}public void error(String m){runOnUiThread(()->{place.setEnabled(true);Toast.makeText(MainActivity.this,m,Toast.LENGTH_LONG).show();});}});}catch(Exception e){Toast.makeText(this,e.getMessage(),Toast.LENGTH_LONG).show();}});add(place);}
+ private void showOrders(){base("My Orders");if(!api.signedIn()){add(t("Orders देखने के लिए login करें.",17));Button b=btn("Login");b.setOnClickListener(v->showLogin());add(b);return;}api.orders(new NativeApi.Callback(){public void ok(JSONObject d){runOnUiThread(()->{try{JSONArray a=d.optJSONArray("data");if(a==null||a.length()==0){add(t("No orders yet.",17));return;}for(int i=0;i<a.length();i++){JSONObject o=a.getJSONObject(i);LinearLayout card=new LinearLayout(MainActivity.this);card.setOrientation(LinearLayout.VERTICAL);String id=o.optString("id");card.addView(t("Order #"+id.substring(0,Math.min(8,id.length())),17));card.addView(t("Status: "+o.optString("status")+"\nTotal: ₹"+o.optDouble("total",0)+"\n"+o.optString("delivery_address"),15));Button tr=btn("📍 Track / Navigate");tr.setOnClickListener(v->showTracking(o));card.addView(tr);root.addView(card);}}catch(Exception e){add(t(e.getMessage(),14));}});}public void error(String m){runOnUiThread(()->add(t("Orders: "+m,14)));}});}
+ private void showTracking(JSONObject o){base("Live Order Tracking");add(t("Order status: "+o.optString("status"),19));double a=o.optDouble("delivery_latitude",0),b=o.optDouble("delivery_longitude",0);if(a!=0&&b!=0){add(t("Delivery pin: "+a+", "+b,14));Button nav=btn("🧭 Open navigation");nav.setOnClickListener(v->{Intent i=new Intent(Intent.ACTION_VIEW,Uri.parse("google.navigation:q="+a+","+b));try{startActivity(i);}catch(Exception e){startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("geo:"+a+","+b+"?q="+a+","+b)));}});add(nav);}add(t("Order realtime data is served by the Supabase backend. In-app map key is a production release setting.",14));}
+ private void showNotifications(){base("Notifications");if(!api.signedIn()){add(t("Login required.",16));return;}api.notifications(new NativeApi.Callback(){public void ok(JSONObject d){runOnUiThread(()->{JSONArray a=d.optJSONArray("data");if(a==null||a.length()==0){add(t("No notifications.",16));return;}for(int i=0;i<a.length();i++){JSONObject n=a.optJSONObject(i);add(t("🔔 "+n.optString("title")+"\n"+n.optString("body"),15));}});}public void error(String m){runOnUiThread(()->add(t(m,14)));}});}
+ private void showProfile(){base("Profile");if(!api.signedIn()){add(t("Customer account",18));Button b=btn("Login / Sign up");b.setOnClickListener(v->showLogin());add(b);}else{api.profile(new NativeApi.Callback(){public void ok(JSONObject d){runOnUiThread(()->{JSONArray a=d.optJSONArray("data");JSONObject p=a==null?null:a.optJSONObject(0);add(t("नाम: "+(p==null?"Customer":p.optString("full_name","Customer"))+"\nमोबाइल: "+(p==null?"":p.optString("phone"))+"\nRole: "+(p==null?"customer":p.optString("role")),17));Button s=btn("Sign out");s.setOnClickListener(v->{api.signOut();showHome();});add(s);});}public void error(String m){runOnUiThread(()->add(t(m,14)));}});}Button p=btn("Careers / Partner with us");p.setOnClickListener(v->showPartner());add(p);}
+ private void showLogin(){base("Login / Sign up");EditText email=new EditText(this);email.setHint("Email");add(email);EditText pass=new EditText(this);pass.setHint("Password");pass.setInputType(129);add(pass);EditText name=new EditText(this);name.setHint("नाम (signup के लिए)");add(name);EditText phone=new EditText(this);phone.setHint("मोबाइल (signup के लिए)");add(phone);Button login=btn("Login");login.setOnClickListener(v->api.signIn(email.getText().toString().trim(),pass.getText().toString(),result("Login successful")));add(login);Button signup=btn("Create account");signup.setOnClickListener(v->api.signUp(email.getText().toString().trim(),pass.getText().toString(),name.getText().toString().trim(),phone.getText().toString().trim(),result("Account created")));add(signup);}
+ private NativeApi.Callback result(String ok){return new NativeApi.Callback(){public void ok(JSONObject d){runOnUiThread(()->{Toast.makeText(MainActivity.this,ok,Toast.LENGTH_SHORT).show();showHome();});}public void error(String m){runOnUiThread(()->Toast.makeText(MainActivity.this,m,Toast.LENGTH_LONG).show());}};}
+ private void showPartner(){base("Partner with Barmer Food Delivery");add(t("Restaurant/Hotel या Delivery Rider के रूप में आवेदन करें.",17));Button r=btn("🏨 Restaurant / Hotel Partner");r.setOnClickListener(v->restaurantForm());add(r);Button d=btn("🛵 Delivery Rider");d.setOnClickListener(v->riderForm());add(d);}
+ private EditText field(String hint){EditText e=new EditText(this);e.setHint(hint);e.setMinHeight(dp(54));add(e);return e;}
+ private void restaurantForm(){if(!api.signedIn()){showLogin();return;}base("Restaurant / Hotel Application");EditText name=field("Restaurant/Hotel name *"),owner=field("Owner name *"),phone=field("Phone *"),addr=field("Address *"),area=field("Barmer area *"),reg=field("Registration/GST no. (optional)");Button s=btn("Submit Application");s.setOnClickListener(v->{JSONObject b=new JSONObject();try{b.put("applicant_id",api.userId());b.put("restaurant_name",name.getText().toString());b.put("owner_name",owner.getText().toString());b.put("phone",phone.getText().toString());b.put("address",addr.getText().toString());b.put("barmer_area",area.getText().toString());b.put("registration_no",reg.getText().toString());api.applyRestaurant(b,result("Application submitted"));}catch(Exception e){Toast.makeText(this,e.getMessage(),Toast.LENGTH_LONG).show();}});add(s);}
+ private void riderForm(){if(!api.signedIn()){showLogin();return;}base("Delivery Rider Application");EditText name=field("Full name *"),phone=field("Phone *"),addr=field("Address *"),vehicle=field("Vehicle number"),lic=field("Driving licence number"),em=field("Emergency contact");Button s=btn("Submit Application");s.setOnClickListener(v->{JSONObject b=new JSONObject();try{b.put("applicant_id",api.userId());b.put("full_name",name.getText().toString());b.put("phone",phone.getText().toString());b.put("address",addr.getText().toString());b.put("vehicle_no",vehicle.getText().toString());b.put("licence_no",lic.getText().toString());b.put("emergency_contact",em.getText().toString());api.applyRider(b,result("Application submitted"));}catch(Exception e){Toast.makeText(this,e.getMessage(),Toast.LENGTH_LONG).show();}});add(s);}
+ private void requestLocation(){if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED){requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION},LOC);return;}LocationManager lm=(LocationManager)getSystemService(LOCATION_SERVICE);try{Location x=lm.getLastKnownLocation(LocationManager.GPS_PROVIDER);if(x==null)x=lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);if(x!=null){lat=x.getLatitude();lng=x.getLongitude();Toast.makeText(this,"Location set: "+lat+", "+lng,Toast.LENGTH_SHORT).show();}else Toast.makeText(this,"GPS location अभी उपलब्ध नहीं है",Toast.LENGTH_LONG).show();}catch(SecurityException e){Toast.makeText(this,"Location permission required",Toast.LENGTH_LONG).show();}}
+ @Override public void onRequestPermissionsResult(int r,String[] p,int[] g){super.onRequestPermissionsResult(r,p,g);if(r==LOC&&g.length>0&&g[0]==PackageManager.PERMISSION_GRANTED)requestLocation();}
 }
