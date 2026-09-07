@@ -8,11 +8,13 @@ Deno.serve(async req=>{
  const auth=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_ANON_KEY')!,{global:{headers:{Authorization:req.headers.get('Authorization')??''}}});
  const {data:{user}}=await auth.auth.getUser(); if(!user)return json({error:'Authentication required'},401);
  const {data:profile}=await admin.from('profiles').select('role').eq('id',user.id).maybeSingle(); if(profile?.role!=='admin')return json({error:'Admin only'},403);
- const body=await req.json().catch(()=>null); const lat=Number(body?.lat),lng=Number(body?.lng);
- if(!body?.order_id||!Number.isFinite(lat)||!Number.isFinite(lng))return json({error:'order_id, lat and lng are required'},400);
+ const body=await req.json().catch(()=>null); if(!body?.order_id)return json({error:'order_id is required'},400);
  const {data:order}=await admin.from('orders').select('id,status,rider_id,restaurant_id').eq('id',body.order_id).maybeSingle();
  if(!order)return json({error:'Order not found'},404);
  if(order.status!=='ready_for_pickup'||order.rider_id)return json({error:'Order is not awaiting rider assignment'},409);
+ const {data:restaurant}=await admin.from('restaurants').select('latitude,longitude,is_approved').eq('id',order.restaurant_id).maybeSingle();
+ if(!restaurant?.is_approved||!Number.isFinite(Number(restaurant.latitude))||!Number.isFinite(Number(restaurant.longitude)))return json({error:'Restaurant pickup location is not configured'},409);
+ const lat=Number(restaurant.latitude),lng=Number(restaurant.longitude);
  const cutoff=new Date(Date.now()-2*60*1000).toISOString();
  const {data:riders,error}=await admin.from('rider_locations').select('rider_id,latitude,longitude,updated_at').eq('is_online',true).gte('updated_at',cutoff).limit(200);
  if(error)return json({error:error.message},500);
@@ -24,7 +26,7 @@ Deno.serve(async req=>{
  const selected=candidates[0]; if(!selected)return json({error:'No nearby approved online rider available'},409);
  const {data:updated,error:updateError}=await admin.from('orders').update({rider_id:selected.rider_id,status:'rider_assigned'}).eq('id',body.order_id).eq('status','ready_for_pickup').is('rider_id',null).select('id,rider_id,status').maybeSingle();
  if(updateError)return json({error:updateError.message},500); if(!updated)return json({error:'Order was assigned by another dispatcher; refresh and retry'},409);
- const {error:notifyError}=await admin.from('notifications').insert({user_id:selected.rider_id,order_id:body.order_id,title:'नया delivery order',body:`Order ${body.order_id} आपके पास है`});
+ const {error:notifyError}=await admin.from('notifications').insert({user_id:selected.rider_id,order_id:body.order_id,type:'order',title:'नया delivery order',body:`Order ${body.order_id} आपके पास है`,data:{status:'rider_assigned'}});
  if(notifyError)return json({error:notifyError.message},500);
  return json({ok:true,order_id:body.order_id,rider_id:selected.rider_id,distance_km:Number(selected.km.toFixed(2))});
 });
