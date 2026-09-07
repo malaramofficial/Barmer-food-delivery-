@@ -61,3 +61,5 @@ jobs:
         with:
           name: barmer-food-delivery-v2-release-aab
           path: android/app/build/outputs/bundle/release/*.aab
+
+# Trigger a fresh build after Google OAuth configuration was added.
