@@ -1,11 +1,12 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const cors = {'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization, x-client-info, apikey, content-type'};
+const cors={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization, x-client-info, apikey, content-type'};
 const json=(b:unknown,s=200)=>new Response(JSON.stringify(b),{status:s,headers:{...cors,'Content-Type':'application/json'}});
 const transitions: Record<string,string[]> = {
   restaurant: ['accepted','preparing','ready_for_pickup'],
   rider: ['picked_up','on_the_way','delivered'],
 };
+const distanceKm=(a:number,b:number,c:number,d:number)=>{const R=6371,rad=Math.PI/180,x=(c-a)*rad,y=(d-b)*rad,q=Math.sin(x/2)**2+Math.cos(a*rad)*Math.cos(c*rad)*Math.sin(y/2)**2;return 2*R*Math.asin(Math.sqrt(q));};
 
 Deno.serve(async req=>{
   if(req.method==='OPTIONS') return new Response('ok',{headers:cors});
@@ -42,15 +43,32 @@ Deno.serve(async req=>{
   if(body.status==='accepted')patch.accepted_at=new Date().toISOString();
   if(body.status==='picked_up')patch.picked_up_at=new Date().toISOString();
   if(body.status==='delivered')patch.delivered_at=new Date().toISOString();
-  const {data:updated,error}=await service.from('orders').update(patch).eq('id',order.id).eq('status',order.status).select('id,status').single();
+  const {data:updated,error}=await service.from('orders').update(patch).eq('id',order.id).eq('status',order.status).select('id,status,customer_id,rider_id,restaurant_id').single();
   if(error||!updated)return json({error:'Order changed; please refresh'},409);
 
   const recipients:any[]=[];
-  const {data:full}=await service.from('orders').select('customer_id,rider_id,restaurant_id,restaurants(owner_id)').eq('id',order.id).single();
-  if(full?.customer_id)recipients.push(full.customer_id);
-  if(full?.rider_id)recipients.push(full.rider_id);
-  const owner=(full as any)?.restaurants?.owner_id; if(owner)recipients.push(owner);
+  if(updated.customer_id)recipients.push(updated.customer_id);
+  if(updated.rider_id)recipients.push(updated.rider_id);
+  const {data:restaurant}=await service.from('restaurants').select('owner_id,name,latitude,longitude').eq('id',updated.restaurant_id).single();
+  if(restaurant?.owner_id)recipients.push(restaurant.owner_id);
   const unique=[...new Set(recipients)].filter((id)=>id!==user.id);
   if(unique.length)await service.from('notifications').insert(unique.map((user_id)=>({user_id,order_id:order.id,type:'order',title:'ऑर्डर अपडेट',body:`ऑर्डर की स्थिति: ${body.status}`,data:{status:body.status}})));
+
+  // When the restaurant marks an order ready, proactively notify eligible nearby riders.
+  // Assignment is still race-safe and is completed only by the rider who accepts first.
+  if(body.status==='ready_for_pickup' && Number.isFinite(Number(restaurant?.latitude)) && Number.isFinite(Number(restaurant?.longitude))){
+    const cutoff=new Date(Date.now()-2*60*1000).toISOString();
+    const {data:riders}=await service.from('rider_locations').select('rider_id,latitude,longitude,updated_at').eq('is_online',true).gte('updated_at',cutoff).limit(200);
+    const ids=[...new Set((riders??[]).map((r:any)=>r.rider_id))];
+    if(ids.length){
+      const {data:approved}=await service.from('rider_applications').select('applicant_id').eq('status','approved').in('applicant_id',ids);
+      const approvedIds=new Set((approved??[]).map((r:any)=>r.applicant_id));
+      const lat=Number(restaurant.latitude),lng=Number(restaurant.longitude);
+      const candidates=(riders??[]).filter((r:any)=>approvedIds.has(r.rider_id)).map((r:any)=>({...r,km:distanceKm(lat,lng,Number(r.latitude),Number(r.longitude))})).filter((r:any)=>r.km<=15).sort((a:any,b:any)=>a.km-b.km);
+      if(candidates.length){
+        await service.from('notifications').insert(candidates.map((r:any)=>({user_id:r.rider_id,order_id:order.id,type:'delivery_job',title:'🛵 नया delivery job',body:`${restaurant.name||'Restaurant'} से pickup — ${r.km.toFixed(1)} km दूर`,data:{status:'ready_for_pickup',distance_km:Number(r.km.toFixed(2))}})));
+      }
+    }
+  }
   return json({ok:true,order_id:updated.id,status:updated.status});
 });
