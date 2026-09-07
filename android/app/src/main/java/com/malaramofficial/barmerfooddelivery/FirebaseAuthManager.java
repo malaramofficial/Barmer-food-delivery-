@@ -48,70 +48,55 @@ public final class FirebaseAuthManager {
     public FirebaseUser currentUser() { return auth == null ? null : auth.getCurrentUser(); }
 
     public void signInWithGoogleIdToken(String idToken, Callback callback) {
-        if (!configured || auth == null) {
-            callback.error("Firebase Auth अभी configure नहीं है। Firebase project credentials जोड़ें।");
-            return;
-        }
-        if (idToken == null || idToken.trim().isEmpty()) {
-            callback.error("Google ID token नहीं मिला।");
-            return;
-        }
+        if (!configured || auth == null) { callback.error("Firebase Auth अभी configure नहीं है।"); return; }
+        if (idToken == null || idToken.trim().isEmpty()) { callback.error("Google ID token नहीं मिला।"); return; }
         auth.signInWithCredential(GoogleAuthProvider.getCredential(idToken, null))
-                .addOnCompleteListener(task -> finish(task, callback));
+                .addOnCompleteListener(task -> finish(task, callback, "Firebase Google Sign-In failed."));
+    }
+
+    public void signInWithEmailPassword(String email, String password, Callback callback) {
+        if (!configured || auth == null) { callback.error("Firebase Auth अभी configure नहीं है।"); return; }
+        auth.signInWithEmailAndPassword(email, password)
+                .addOnCompleteListener(task -> finish(task, callback, "Firebase email login failed."));
+    }
+
+    public void createUserWithEmailPassword(String email, String password, Callback callback) {
+        if (!configured || auth == null) { callback.error("Firebase Auth अभी configure नहीं है।"); return; }
+        auth.createUserWithEmailAndPassword(email, password)
+                .addOnCompleteListener(task -> finish(task, callback, "Firebase account creation failed."));
     }
 
     public void idToken(Callback callback) {
-        if (!configured || auth == null) {
-            callback.error("Firebase Auth अभी configure नहीं है।");
-            return;
-        }
+        if (!configured || auth == null) { callback.error("Firebase Auth अभी configure नहीं है।"); return; }
         FirebaseUser user = auth.getCurrentUser();
-        if (user == null) {
-            callback.error("Firebase session उपलब्ध नहीं है।");
-            return;
-        }
-        user.getIdToken(false).addOnCompleteListener(task -> {
-            if (task.isSuccessful() && task.getResult() != null) {
-                String token = task.getResult().getToken();
-                if (token != null && !token.isEmpty()) { callback.ok(token); return; }
-            }
-            callback.error(task.getException() == null ? "Firebase ID token नहीं मिला।" : task.getException().getMessage());
-        });
+        if (user == null) { callback.error("Firebase session उपलब्ध नहीं है।"); return; }
+        user.getIdToken(false).addOnCompleteListener(task -> returnToken(task, callback, "Firebase ID token नहीं मिला।"));
     }
 
     public void forceRefreshToken(Callback callback) {
-        if (!configured || auth == null || auth.getCurrentUser() == null) {
-            callback.error("Firebase session उपलब्ध नहीं है।");
-            return;
-        }
-        auth.getCurrentUser().getIdToken(true).addOnCompleteListener(task -> {
-            if (task.isSuccessful() && task.getResult() != null) {
-                String token = task.getResult().getToken();
-                if (token != null && !token.isEmpty()) { callback.ok(token); return; }
-            }
-            callback.error(task.getException() == null ? "Firebase ID token refresh failed." : task.getException().getMessage());
-        });
+        if (!configured || auth == null || auth.getCurrentUser() == null) { callback.error("Firebase session उपलब्ध नहीं है।"); return; }
+        auth.getCurrentUser().getIdToken(true).addOnCompleteListener(task -> returnToken(task, callback, "Firebase ID token refresh failed."));
     }
 
-    public void signOut() {
-        if (auth != null) auth.signOut();
-    }
+    public void signOut() { if (auth != null) auth.signOut(); }
 
-    private static void finish(Task<AuthResult> task, Callback callback) {
+    private static void finish(Task<AuthResult> task, Callback callback, String fallback) {
         if (!task.isSuccessful() || task.getResult() == null || task.getResult().getUser() == null) {
             Exception e = task.getException();
-            callback.error(e == null || e.getMessage() == null ? "Firebase Google Sign-In failed." : e.getMessage());
+            callback.error(e == null || e.getMessage() == null ? fallback : e.getMessage());
             return;
         }
-        FirebaseUser user = task.getResult().getUser();
-        user.getIdToken(true).addOnCompleteListener(tokenTask -> {
-            if (tokenTask.isSuccessful() && tokenTask.getResult() != null) {
-                String token = tokenTask.getResult().getToken();
-                if (token != null && !token.isEmpty()) { callback.ok(token); return; }
-            }
-            Exception e = tokenTask.getException();
-            callback.error(e == null || e.getMessage() == null ? "Firebase ID token नहीं मिला।" : e.getMessage());
-        });
+        task.getResult().getUser().getIdToken(true)
+                .addOnCompleteListener(tokenTask -> returnToken(tokenTask, callback, "Firebase ID token नहीं मिला।"));
+    }
+
+    private static void returnToken(Task<com.google.firebase.auth.GetTokenResult> task, Callback callback, String fallback) {
+        if (task.isSuccessful() && task.getResult() != null) {
+            String token = task.getResult().getToken();
+            if (token != null && !token.isEmpty()) { callback.ok(token); return; }
+        }
+        Exception e = task.getException();
+        callback.error(e == null || e.getMessage() == null ? fallback : e.getMessage());
     }
 
     private static String safe(String value) { return value == null ? "" : value.trim(); }
