@@ -14,13 +14,11 @@ import java.util.concurrent.Executor;
 /** Native Google sign-in. Google credential -> Firebase Auth -> Firebase JWT -> Supabase. */
 public final class GoogleAuth {
     public interface Callback { void ok(); void error(String message); }
-    private final Context context;
     private final CredentialManager manager;
     private final Executor executor;
     private final FirebaseAuthManager firebase;
 
     public GoogleAuth(Context context) {
-        this.context = context.getApplicationContext();
         this.manager = CredentialManager.create(context);
         this.executor = context.getMainExecutor();
         this.firebase = new FirebaseAuthManager(context);
@@ -57,7 +55,8 @@ public final class GoogleAuth {
                             GoogleIdTokenCredential google = GoogleIdTokenCredential.createFrom(custom.getData());
                             firebase.signInWithGoogleIdToken(google.getIdToken(), new FirebaseAuthManager.Callback() {
                                 @Override public void ok(String firebaseToken) {
-                                    api.setFirebaseSession(firebaseToken);
+                                    String uid = firebase.currentUser() == null ? "" : firebase.currentUser().getUid();
+                                    api.setFirebaseSession(firebaseToken, uid);
                                     callback.ok();
                                 }
                                 @Override public void error(String message) { callback.error(message); }
