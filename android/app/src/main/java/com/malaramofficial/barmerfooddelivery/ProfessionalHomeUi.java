@@ -17,98 +17,35 @@ import java.util.List;
 /** Clean, production-oriented customer home renderer. Keeps business logic in MainActivity/NativeApi. */
 public final class ProfessionalHomeUi {
     private ProfessionalHomeUi() {}
-
-    private static final int PRIMARY = Color.rgb(225, 78, 32);
-    private static final int INK = Color.rgb(28, 29, 31);
-    private static final int MUTED = Color.rgb(108, 109, 113);
-    private static final int BG = Color.rgb(247, 247, 245);
-    private static final int SURFACE = Color.WHITE;
-    private static final int SOFT = Color.rgb(255, 242, 236);
-    private static final int LINE = Color.rgb(229, 227, 223);
-    private static final int GREEN = Color.rgb(28, 132, 74);
-
-    public interface Actions {
-        void restaurant(JSONObject item);
-        void location();
-        void orders();
-        void notifications();
-        void partner();
-        void profile();
-        void cart();
-    }
-
-    private static int dp(MainActivity a, int n) { return (int)(n * a.getResources().getDisplayMetrics().density + .5f); }
-    private static GradientDrawable bg(MainActivity a, int color, float radius) { GradientDrawable g=new GradientDrawable(); g.setColor(color); g.setCornerRadius(dp(a,(int)radius)); return g; }
-    private static GradientDrawable outline(MainActivity a, int color, int stroke, float radius) { GradientDrawable g=bg(a,SURFACE,radius); g.setStroke(dp(a,stroke),color); return g; }
-    private static TextView text(MainActivity a,String s,float size,int color){TextView v=new TextView(a);v.setText(s);v.setTextSize(size);v.setTextColor(color);v.setIncludeFontPadding(true);v.setFontFeatureSettings("kern");return v;}
+    private static final int PRIMARY=Color.rgb(225,78,32),INK=Color.rgb(28,29,31),MUTED=Color.rgb(108,109,113),BG=Color.rgb(247,247,245),SURFACE=Color.WHITE,SOFT=Color.rgb(255,242,236),LINE=Color.rgb(229,227,223),GREEN=Color.rgb(28,132,74);
+    public interface Actions { void restaurant(JSONObject item); void location(); void orders(); void notifications(); void partner(); void profile(); void cart(); }
+    private static int dp(MainActivity a,int n){return(int)(n*a.getResources().getDisplayMetrics().density+.5f);}
+    private static GradientDrawable bg(MainActivity a,int c,float r){GradientDrawable g=new GradientDrawable();g.setColor(c);g.setCornerRadius(dp(a,(int)r));return g;}
+    private static GradientDrawable outline(MainActivity a,int c,int s,float r){GradientDrawable g=bg(a,SURFACE,r);g.setStroke(dp(a,s),c);return g;}
+    private static TextView text(MainActivity a,String s,float size,int c){TextView v=new TextView(a);v.setText(s);v.setTextSize(size);v.setTextColor(c);v.setIncludeFontPadding(true);v.setFontFeatureSettings("kern");return v;}
     private static void type(TextView v,int style){v.setTypeface(Typeface.create("sans-serif",style));}
     private static LinearLayout column(MainActivity a){LinearLayout l=new LinearLayout(a);l.setOrientation(LinearLayout.VERTICAL);return l;}
 
-    public static void render(MainActivity a, NativeApi api, double lat, Actions actions) {
-        a.getWindow().setStatusBarColor(SURFACE);
-        a.getWindow().setNavigationBarColor(SURFACE);
-        a.getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
-
-        LinearLayout root = column(a); root.setBackgroundColor(BG); root.setPadding(dp(a,18),0,dp(a,18),0);
-        LinearLayout top = new LinearLayout(a); top.setGravity(Gravity.CENTER_VERTICAL); top.setPadding(0,dp(a,8),0,dp(a,8));
-        LinearLayout brand = column(a);
-        TextView kicker=text(a,"BARMER FOOD",11,MUTED); type(kicker,Typeface.BOLD); brand.addView(kicker);
-        TextView title=text(a,"Good food, delivered.",17,INK); type(title,Typeface.BOLD); brand.addView(title);
-        top.addView(brand,new LinearLayout.LayoutParams(0,dp(a,58),1));
-        TextView cart=text(a,"Bag",13,INK); type(cart,Typeface.BOLD); cart.setGravity(Gravity.CENTER); cart.setBackground(outline(a,LINE,1,16)); cart.setOnClickListener(v->actions.cart());
-        top.addView(cart,new LinearLayout.LayoutParams(dp(a,56),dp(a,40)));
-        TextView profile=text(a,"●",20,PRIMARY); profile.setGravity(Gravity.CENTER); profile.setContentDescription("Profile"); profile.setOnClickListener(v->actions.profile());
-        LinearLayout.LayoutParams pp=new LinearLayout.LayoutParams(dp(a,42),dp(a,42));pp.setMargins(dp(a,8),0,0,0);top.addView(profile,pp); root.addView(top);
-
-        ScrollView scroll=new ScrollView(a);scroll.setFillViewport(true);scroll.setClipToPadding(false);
-        LinearLayout content=column(a);content.setPadding(0,0,0,dp(a,18));scroll.addView(content);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
-
-        LinearLayout location= new LinearLayout(a); location.setGravity(Gravity.CENTER_VERTICAL); location.setPadding(dp(a,13),dp(a,10),dp(a,10),dp(a,10)); location.setBackground(bg(a,SURFACE,16));
-        TextView pin=text(a,"⌖",22,PRIMARY);pin.setGravity(Gravity.CENTER);location.addView(pin,new LinearLayout.LayoutParams(dp(a,34),dp(a,40)));
-        LinearLayout locCopy=column(a); TextView small=text(a,"DELIVER TO",10,MUTED);type(small,Typeface.BOLD);locCopy.addView(small); TextView place=text(a,lat==0?"Choose your location":"Current location",14,INK);type(place,Typeface.BOLD);locCopy.addView(place);location.addView(locCopy,new LinearLayout.LayoutParams(0,-2,1));
-        TextView change=text(a,"Change",12,PRIMARY);type(change,Typeface.BOLD);change.setGravity(Gravity.CENTER);change.setOnClickListener(v->actions.location());location.addView(change,new LinearLayout.LayoutParams(dp(a,62),dp(a,40)));
-        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.setMargins(0,0,0,dp(a,12));content.addView(location,lp);
-
-        LinearLayout search=new LinearLayout(a);search.setGravity(Gravity.CENTER_VERTICAL);search.setPadding(dp(a,14),0,dp(a,12),0);search.setBackground(outline(a,LINE,1,16));
-        TextView icon=text(a,"⌕",25,MUTED);icon.setGravity(Gravity.CENTER);search.addView(icon,new LinearLayout.LayoutParams(dp(a,30),dp(a,52)));
-        EditText q=new EditText(a);q.setHint("Search restaurants or dishes");q.setTextSize(15);q.setTextColor(INK);q.setHintTextColor(MUTED);q.setSingleLine(true);q.setBackgroundColor(Color.TRANSPARENT);q.setPadding(0,0,0,0);search.addView(q,new LinearLayout.LayoutParams(0,dp(a,52),1));
-        LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(-1,dp(a,52));sp.setMargins(0,0,0,dp(a,18));content.addView(search,sp);
-
-        LinearLayout hero=new LinearLayout(a);hero.setOrientation(LinearLayout.VERTICAL);hero.setPadding(dp(a,20),dp(a,20),dp(a,20),dp(a,20));hero.setBackground(bg(a,PRIMARY,22));
-        TextView h1=text(a,"क्या खाने का मन है?",25,Color.WHITE);type(h1,Typeface.BOLD);hero.addView(h1);
-        TextView hs=text(a,"बारमेर के पसंदीदा restaurants\nसे ताज़ा खाना घर तक मंगाएँ।",14,Color.rgb(255,241,235));hero.addView(hs);
-        TextView action=text(a,"Restaurants देखें  →",13,Color.WHITE);type(action,Typeface.BOLD);action.setPadding(0,dp(a,13),0,0);hero.addView(action);
-        LinearLayout.LayoutParams hp=new LinearLayout.LayoutParams(-1,-2);hp.setMargins(0,0,0,dp(a,20));content.addView(hero,hp);
-
-        LinearLayout heading=new LinearLayout(a);heading.setGravity(Gravity.CENTER_VERTICAL);TextView rt=text(a,"Explore",19,INK);type(rt,Typeface.BOLD);heading.addView(rt,new LinearLayout.LayoutParams(0,-2,1));TextView hint=text(a,"Fast & simple",11,MUTED);heading.addView(hint);content.addView(heading);
+    public static void render(MainActivity a,NativeApi api,double lat,Actions actions){
+        a.getWindow().setStatusBarColor(SURFACE);a.getWindow().setNavigationBarColor(SURFACE);a.getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
+        LinearLayout root=column(a);root.setBackgroundColor(BG);root.setPadding(dp(a,18),0,dp(a,18),0);
+        LinearLayout top=new LinearLayout(a);top.setGravity(Gravity.CENTER_VERTICAL);top.setPadding(0,dp(a,8),0,dp(a,8));
+        LinearLayout brand=column(a);TextView kicker=text(a,"BARMER FOOD",11,MUTED);type(kicker,Typeface.BOLD);brand.addView(kicker);TextView title=text(a,"Good food, delivered.",17,INK);type(title,Typeface.BOLD);brand.addView(title);top.addView(brand,new LinearLayout.LayoutParams(0,dp(a,58),1));
+        TextView cart=text(a,"Bag",13,INK);type(cart,Typeface.BOLD);cart.setGravity(Gravity.CENTER);cart.setBackground(outline(a,LINE,1,16));cart.setOnClickListener(v->actions.cart());top.addView(cart,new LinearLayout.LayoutParams(dp(a,56),dp(a,40)));
+        TextView profile=text(a,"●",20,PRIMARY);profile.setGravity(Gravity.CENTER);profile.setContentDescription("Profile");profile.setOnClickListener(v->actions.profile());LinearLayout.LayoutParams pp=new LinearLayout.LayoutParams(dp(a,42),dp(a,42));pp.setMargins(dp(a,8),0,0,0);top.addView(profile,pp);root.addView(top);
+        ScrollView scroll=new ScrollView(a);scroll.setFillViewport(true);scroll.setClipToPadding(false);LinearLayout content=column(a);content.setPadding(0,0,0,dp(a,18));scroll.addView(content);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
+        LinearLayout location=new LinearLayout(a);location.setGravity(Gravity.CENTER_VERTICAL);location.setPadding(dp(a,13),dp(a,10),dp(a,10),dp(a,10));location.setBackground(bg(a,SURFACE,16));TextView pin=text(a,"⌖",22,PRIMARY);pin.setGravity(Gravity.CENTER);location.addView(pin,new LinearLayout.LayoutParams(dp(a,34),dp(a,40)));LinearLayout locCopy=column(a);TextView small=text(a,"DELIVER TO",10,MUTED);type(small,Typeface.BOLD);locCopy.addView(small);TextView place=text(a,lat==0?"Choose your location":"Current location",14,INK);type(place,Typeface.BOLD);locCopy.addView(place);location.addView(locCopy,new LinearLayout.LayoutParams(0,-2,1));TextView change=text(a,"Change",12,PRIMARY);type(change,Typeface.BOLD);change.setGravity(Gravity.CENTER);change.setOnClickListener(v->actions.location());location.addView(change,new LinearLayout.LayoutParams(dp(a,62),dp(a,40)));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.setMargins(0,0,0,dp(a,12));content.addView(location,lp);
+        LinearLayout search=new LinearLayout(a);search.setGravity(Gravity.CENTER_VERTICAL);search.setPadding(dp(a,14),0,dp(a,12),0);search.setBackground(outline(a,LINE,1,16));TextView icon=text(a,"⌕",25,MUTED);icon.setGravity(Gravity.CENTER);search.addView(icon,new LinearLayout.LayoutParams(dp(a,30),dp(a,52)));EditText q=new EditText(a);q.setHint("Search restaurants or dishes");q.setTextSize(15);q.setTextColor(INK);q.setHintTextColor(MUTED);q.setSingleLine(true);q.setBackgroundColor(Color.TRANSPARENT);q.setPadding(0,0,0,0);search.addView(q,new LinearLayout.LayoutParams(0,dp(a,52),1));LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(-1,dp(a,52));sp.setMargins(0,0,0,dp(a,18));content.addView(search,sp);
+        LinearLayout hero=column(a);hero.setPadding(dp(a,20),dp(a,20),dp(a,20),dp(a,20));hero.setBackground(bg(a,PRIMARY,22));TextView h1=text(a,"क्या खाने का मन है?",25,Color.WHITE);type(h1,Typeface.BOLD);hero.addView(h1);hero.addView(text(a,"बारमेर के पसंदीदा restaurants\nसे ताज़ा खाना घर तक मंगाएँ।",14,Color.rgb(255,241,235)));TextView action=text(a,"Restaurants देखें  →",13,Color.WHITE);type(action,Typeface.BOLD);action.setPadding(0,dp(a,13),0,0);hero.addView(action);LinearLayout.LayoutParams hp=new LinearLayout.LayoutParams(-1,-2);hp.setMargins(0,0,0,dp(a,20));content.addView(hero,hp);
+        LinearLayout heading=new LinearLayout(a);heading.setGravity(Gravity.CENTER_VERTICAL);TextView rt=text(a,"Explore",19,INK);type(rt,Typeface.BOLD);heading.addView(rt,new LinearLayout.LayoutParams(0,-2,1));heading.addView(text(a,"Fast & simple",11,MUTED));content.addView(heading);
         LinearLayout chips=new LinearLayout(a);chips.setPadding(0,dp(a,10),0,dp(a,18));String[] names={"All","Meals","Fast food","Drinks","Dessert"};for(int i=0;i<names.length;i++){TextView c=text(a,names[i],12,i==0?PRIMARY:INK);type(c,Typeface.BOLD);c.setGravity(Gravity.CENTER);c.setPadding(dp(a,15),0,dp(a,15),0);c.setBackground(bg(a,i==0?SOFT:SURFACE,20));LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-2,dp(a,38));if(i>0)cp.setMargins(dp(a,7),0,0,0);chips.addView(c,cp);}content.addView(chips);
-
-        LinearLayout rh=new LinearLayout(a);rh.setGravity(Gravity.CENTER_VERTICAL);TextView rtitle=text(a,"Restaurants",20,INK);type(rtitle,Typeface.BOLD);rh.addView(rtitle,new LinearLayout.LayoutParams(0,-2,1));TextView count=text(a,"Nearby",12,MUTED);rh.addView(count);content.addView(rh);
-        LinearLayout list=column(a);LinearLayout.LayoutParams listp=new LinearLayout.LayoutParams(-1,-2);listp.setMargins(0,dp(a,8),0,0);content.addView(list,listp);
-
-        if(!api.configured()){
-            list.addView(emptyState(a,"Restaurants will appear here","Connect the app to its backend to load live restaurants.","Backend setup"));
-        } else {
-            TextView loading=text(a,"Loading restaurants…",13,MUTED);loading.setPadding(dp(a,2),dp(a,18),0,dp(a,18));list.addView(loading);
-            api.restaurants(new NativeApi.Callback(){public void ok(JSONObject r){a.runOnUiThread(()->{list.removeAllViews();try{JSONArray arr=r.optJSONArray("data");if(arr==null||arr.length()==0){list.addView(emptyState(a,"No restaurants yet","Approved Barmer restaurants will appear here.","Check again"));return;}List<JSONObject> items=new ArrayList<>();for(int i=0;i<arr.length();i++)items.add(arr.getJSONObject(i));for(JSONObject item:items)list.addView(restaurantCard(a,item,actions));q.addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence s,int st,int c,int af){}public void onTextChanged(CharSequence s,int st,int before,int count){String term=s.toString().trim().toLowerCase();for(int i=0;i<list.getChildCount();i++){View v=list.getChildAt(i);if(!(v.getTag() instanceof JSONObject))continue;JSONObject x=(JSONObject)v.getTag();String hay=(x.optString("name")+" "+x.optString("cuisine")+" "+x.optString("area")).toLowerCase();v.setVisibility(term.isEmpty()||hay.contains(term)?View.VISIBLE:View.GONE);}}public void afterTextChanged(Editable e){}});
-            }catch(Exception e){list.addView(emptyState(a,"Couldn’t load restaurants","Please try again.","Retry"));}});}public void error(String m){a.runOnUiThread(()->{list.removeAllViews();list.addView(emptyState(a,"Restaurants unavailable","Please check your connection and try again.","Retry"));});}});
-        }
-
-        LinearLayout quick=column(a);quick.setPadding(0,dp(a,18),0,0);TextView qh=text(a,"Your shortcuts",17,INK);type(qh,Typeface.BOLD);quick.addView(qh);LinearLayout actionsRow=new LinearLayout(a);actionsRow.setPadding(0,dp(a,10),0,0);quick.addView(actionsRow);
-        addShortcut(a,actionsRow,"Orders","Track orders",actions::orders);addShortcut(a,actionsRow,"Alerts","Updates",actions::notifications);addShortcut(a,actionsRow,"Partner","Join us",actions::partner); content.addView(quick);
-
-        LinearLayout bottom=new LinearLayout(a);bottom.setGravity(Gravity.CENTER_VERTICAL);bottom.setPadding(0,dp(a,7),0,dp(a,8));bottom.setBackgroundColor(SURFACE);bottom.setElevation(dp(a,10));
-        addNav(a,bottom,"⌂","Home",true,()->{});addNav(a,bottom,"▣","Orders",false,actions::orders);addNav(a,bottom,"●","Profile",false,actions::profile);root.addView(bottom,new LinearLayout.LayoutParams(-1,dp(a,64)));
-        a.setContentView(root);
+        LinearLayout rh=new LinearLayout(a);rh.setGravity(Gravity.CENTER_VERTICAL);TextView rtitle=text(a,"Restaurants",20,INK);type(rtitle,Typeface.BOLD);rh.addView(rtitle,new LinearLayout.LayoutParams(0,-2,1));rh.addView(text(a,"Nearby",12,MUTED));content.addView(rh);LinearLayout list=column(a);LinearLayout.LayoutParams listp=new LinearLayout.LayoutParams(-1,-2);listp.setMargins(0,dp(a,8),0,0);content.addView(list,listp);
+        if(!api.configured()){list.addView(emptyState(a,"Restaurants will appear here","Connect the app to its backend to load live restaurants."));}else{TextView loading=text(a,"Loading restaurants…",13,MUTED);loading.setPadding(dp(a,2),dp(a,18),0,dp(a,18));list.addView(loading);api.restaurants(new NativeApi.Callback(){public void ok(JSONObject r){a.runOnUiThread(()->{list.removeAllViews();try{JSONArray arr=r.optJSONArray("data");if(arr==null||arr.length()==0){list.addView(emptyState(a,"No restaurants yet","Approved Barmer restaurants will appear here."));return;}List<JSONObject> items=new ArrayList<>();for(int i=0;i<arr.length();i++)items.add(arr.getJSONObject(i));for(JSONObject item:items)list.addView(restaurantCard(a,item,actions));q.addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence s,int st,int c,int af){}public void onTextChanged(CharSequence s,int st,int before,int count){String term=s.toString().trim().toLowerCase();for(int i=0;i<list.getChildCount();i++){View v=list.getChildAt(i);if(!(v.getTag() instanceof JSONObject))continue;JSONObject x=(JSONObject)v.getTag();String hay=(x.optString("name")+" "+x.optString("cuisine")+" "+x.optString("area")).toLowerCase();v.setVisibility(term.isEmpty()||hay.contains(term)?View.VISIBLE:View.GONE);}}public void afterTextChanged(Editable e){}});}catch(Exception e){list.addView(emptyState(a,"Couldn’t load restaurants","Please try again."));}});}public void error(String m){a.runOnUiThread(()->{list.removeAllViews();list.addView(emptyState(a,"Restaurants unavailable","Please check your connection and try again."));});}});}
+        LinearLayout quick=column(a);quick.setPadding(0,dp(a,18),0,0);TextView qh=text(a,"Your shortcuts",17,INK);type(qh,Typeface.BOLD);quick.addView(qh);LinearLayout actionsRow=new LinearLayout(a);actionsRow.setPadding(0,dp(a,10),0,0);quick.addView(actionsRow);addShortcut(a,actionsRow,"Orders","Track orders",v->actions.orders());addShortcut(a,actionsRow,"Alerts","Updates",v->actions.notifications());addShortcut(a,actionsRow,"Partner","Join us",v->actions.partner());content.addView(quick);
+        LinearLayout bottom=new LinearLayout(a);bottom.setGravity(Gravity.CENTER_VERTICAL);bottom.setPadding(0,dp(a,7),0,dp(a,8));bottom.setBackgroundColor(SURFACE);bottom.setElevation(dp(a,10));addNav(a,bottom,"⌂","Home",true,v->{});addNav(a,bottom,"▣","Orders",false,v->actions.orders());addNav(a,bottom,"●","Profile",false,v->actions.profile());root.addView(bottom,new LinearLayout.LayoutParams(-1,dp(a,64)));a.setContentView(root);
     }
-
-    private static LinearLayout restaurantCard(MainActivity a,JSONObject x,Actions actions){
-        LinearLayout c=column(a);c.setPadding(dp(a,14),dp(a,13),dp(a,14),dp(a,13));c.setBackground(bg(a,SURFACE,18));c.setElevation(dp(a,1));c.setTag(x);c.setOnClickListener(v->{if(x.optBoolean("is_open",true))actions.restaurant(x);else Toast.makeText(a,"Restaurant अभी बंद है",Toast.LENGTH_SHORT).show();});
-        LinearLayout row=new LinearLayout(a);row.setGravity(Gravity.CENTER_VERTICAL);TextView logo=text(a,"BF",16,PRIMARY);type(logo,Typeface.BOLD);logo.setGravity(Gravity.CENTER);logo.setBackground(bg(a,SOFT,15));row.addView(logo,new LinearLayout.LayoutParams(dp(a,56),dp(a,56)));
-        LinearLayout info=column(a);info.setPadding(dp(a,12),0,dp(a,8),0);TextView n=text(a,x.optString("name","Restaurant"),16,INK);type(n,Typeface.BOLD);info.addView(n);TextView meta=text(a,x.optString("cuisine","Food")+"  •  "+x.optString("area","Barmer"),12,MUTED);info.addView(meta);boolean open=x.optBoolean("is_open",true);TextView status=text(a,open?"Open now":"Closed",11,open?GREEN:MUTED);type(status,Typeface.BOLD);info.addView(status);row.addView(info,new LinearLayout.LayoutParams(0,-2,1));TextView arrow=text(a,"→",20,PRIMARY);arrow.setGravity(Gravity.CENTER);row.addView(arrow,new LinearLayout.LayoutParams(dp(a,34),dp(a,44)));c.addView(row);
-        LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.setMargins(0,0,0,dp(a,10));c.setLayoutParams(p);return c;
-    }
-    private static LinearLayout emptyState(MainActivity a,String title,String sub,String action){LinearLayout c=column(a);c.setGravity(Gravity.CENTER);c.setPadding(dp(a,20),dp(a,26),dp(a,20),dp(a,26));c.setBackground(bg(a,SURFACE,18));TextView i=text(a,"—",26,PRIMARY);type(i,Typeface.BOLD);i.setGravity(Gravity.CENTER);c.addView(i);TextView t=text(a,title,16,INK);type(t,Typeface.BOLD);t.setGravity(Gravity.CENTER);c.addView(t);TextView s=text(a,sub,12,MUTED);s.setGravity(Gravity.CENTER);c.addView(s);TextView b=text(a,action,12,PRIMARY);type(b,Typeface.BOLD);b.setGravity(Gravity.CENTER);b.setPadding(0,dp(a,12),0,0);c.addView(b);return c;}
-    private static void addShortcut(MainActivity a,LinearLayout row,String title,String sub,View.OnClickListener click){LinearLayout c=column(a);c.setGravity(Gravity.CENTER_VERTICAL);c.setPadding(dp(a,12),dp(a,11),dp(a,12),dp(a,11));c.setBackground(outline(a,LINE,1,16));c.setOnClickListener(click);TextView t=text(a,title,12,INK);type(t,Typeface.BOLD);c.addView(t);TextView s=text(a,sub,10,MUTED);c.addView(s);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,dp(a,64),1);p.setMargins(0,0,dp(a,7),0);row.addView(c,p);}
+    private static LinearLayout restaurantCard(MainActivity a,JSONObject x,Actions actions){LinearLayout c=column(a);c.setPadding(dp(a,14),dp(a,13),dp(a,14),dp(a,13));c.setBackground(bg(a,SURFACE,18));c.setElevation(dp(a,1));c.setTag(x);c.setOnClickListener(v->{if(x.optBoolean("is_open",true))actions.restaurant(x);else Toast.makeText(a,"Restaurant अभी बंद है",Toast.LENGTH_SHORT).show();});LinearLayout row=new LinearLayout(a);row.setGravity(Gravity.CENTER_VERTICAL);TextView logo=text(a,"BF",16,PRIMARY);type(logo,Typeface.BOLD);logo.setGravity(Gravity.CENTER);logo.setBackground(bg(a,SOFT,15));row.addView(logo,new LinearLayout.LayoutParams(dp(a,56),dp(a,56)));LinearLayout info=column(a);info.setPadding(dp(a,12),0,dp(a,8),0);TextView n=text(a,x.optString("name","Restaurant"),16,INK);type(n,Typeface.BOLD);info.addView(n);info.addView(text(a,x.optString("cuisine","Food")+"  •  "+x.optString("area","Barmer"),12,MUTED));boolean open=x.optBoolean("is_open",true);TextView status=text(a,open?"Open now":"Closed",11,open?GREEN:MUTED);type(status,Typeface.BOLD);info.addView(status);row.addView(info,new LinearLayout.LayoutParams(0,-2,1));TextView arrow=text(a,"→",20,PRIMARY);arrow.setGravity(Gravity.CENTER);row.addView(arrow,new LinearLayout.LayoutParams(dp(a,34),dp(a,44)));c.addView(row);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.setMargins(0,0,0,dp(a,10));c.setLayoutParams(p);return c;}
+    private static LinearLayout emptyState(MainActivity a,String title,String sub){LinearLayout c=column(a);c.setGravity(Gravity.CENTER);c.setPadding(dp(a,20),dp(a,25),dp(a,20),dp(a,25));c.setBackground(bg(a,SURFACE,18));TextView i=text(a,"—",26,PRIMARY);type(i,Typeface.BOLD);i.setGravity(Gravity.CENTER);c.addView(i);TextView t=text(a,title,16,INK);type(t,Typeface.BOLD);t.setGravity(Gravity.CENTER);c.addView(t);TextView s=text(a,sub,12,MUTED);s.setGravity(Gravity.CENTER);c.addView(s);return c;}
+    private static void addShortcut(MainActivity a,LinearLayout row,String title,String sub,View.OnClickListener click){LinearLayout c=column(a);c.setGravity(Gravity.CENTER_VERTICAL);c.setPadding(dp(a,12),dp(a,11),dp(a,12),dp(a,11));c.setBackground(outline(a,LINE,1,16));c.setOnClickListener(click);TextView t=text(a,title,12,INK);type(t,Typeface.BOLD);c.addView(t);c.addView(text(a,sub,10,MUTED));LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,dp(a,64),1);p.setMargins(0,0,dp(a,7),0);row.addView(c,p);}
     private static void addNav(MainActivity a,LinearLayout row,String icon,String label,boolean selected,View.OnClickListener click){LinearLayout item=column(a);item.setGravity(Gravity.CENTER);item.setOnClickListener(click);TextView i=text(a,icon,19,selected?PRIMARY:MUTED);i.setGravity(Gravity.CENTER);item.addView(i);TextView t=text(a,label,10,selected?PRIMARY:MUTED);type(t,Typeface.BOLD);t.setGravity(Gravity.CENTER);item.addView(t);row.addView(item,new LinearLayout.LayoutParams(0,-1,1));}
 }
