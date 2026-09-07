@@ -3,6 +3,7 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <application android:name=".BfdApplication" android:theme="@style/AppTheme" android:label="Barmer Food Delivery" android:usesCleartextTraffic="false" android:resizeableActivity="true">
+        <activity android:name=".AdminActivity" android:exported="false" android:screenOrientation="portrait" />
         <activity android:name=".MainActivity" android:exported="true" android:screenOrientation="portrait">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
