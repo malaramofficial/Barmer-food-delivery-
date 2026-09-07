@@ -126,38 +126,15 @@ public class MainActivity extends Activity {
     }
 
     private void showHome() {
-        base("Barmer Food Delivery");
-        LinearLayout hero = new LinearLayout(this); hero.setOrientation(LinearLayout.VERTICAL); hero.setPadding(dp(20),dp(22),dp(20),dp(22)); hero.setBackground(shape(PRIMARY,24));
-        TextView small=tv("BARmer • FOOD • DELIVERY",12,Color.WHITE); small.setTypeface(Typeface.DEFAULT,Typeface.BOLD); hero.addView(small);
-        TextView main=tv("भूख लगी है?\nआज क्या खाएँ?",28,Color.WHITE); main.setTypeface(Typeface.DEFAULT,Typeface.BOLD); hero.addView(main,new LinearLayout.LayoutParams(-1,-2));
-        TextView sub=tv("बारमेर के पसंदीदा restaurants से\nखाना सीधे आपके दरवाज़े तक।",14,Color.rgb(255,240,234)); hero.addView(sub);
-        LinearLayout.LayoutParams hp=new LinearLayout.LayoutParams(-1,-2); hp.setMargins(0,dp(5),0,dp(10)); content.addView(hero,hp);
-
-        LinearLayout search = new LinearLayout(this); search.setGravity(Gravity.CENTER_VERTICAL); search.setPadding(dp(16),0,dp(10),0); search.setBackground(shape(SURFACE,18)); search.setElevation(dp(1));
-        TextView glass=tv("⌕",25,MUTED); search.addView(glass,new LinearLayout.LayoutParams(dp(30),dp(54)));
-        EditText q=new EditText(this); q.setHint("Restaurant या dish खोजें"); q.setTextSize(15); q.setSingleLine(); q.setBackgroundColor(Color.TRANSPARENT); search.addView(q,new LinearLayout.LayoutParams(0,dp(54),1));
-        TextView filter=tv("☷",22,PRIMARY); filter.setGravity(Gravity.CENTER); search.addView(filter,new LinearLayout.LayoutParams(dp(40),dp(54)));
-        LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(-1,dp(54)); sp.setMargins(0,0,0,dp(12)); content.addView(search,sp);
-
-        LinearLayout loc=new LinearLayout(this); loc.setGravity(Gravity.CENTER_VERTICAL); loc.setPadding(dp(14),dp(10),dp(14),dp(10)); loc.setBackground(shape(SOFT,16));
-        TextView li=tv("⌖",23,PRIMARY); loc.addView(li,new LinearLayout.LayoutParams(dp(34),dp(38)));
-        LinearLayout lt=new LinearLayout(this); lt.setOrientation(LinearLayout.VERTICAL); TextView a=label("DELIVER TO"); lt.addView(a); TextView b=tv(lat==0?"Set your location":"Current location set",14,INK); b.setTypeface(Typeface.DEFAULT,Typeface.BOLD); lt.addView(b); loc.addView(lt,new LinearLayout.LayoutParams(0,-2,1));
-        Button set=secondary("Change"); set.setTextSize(12); set.setMinHeight(dp(38)); set.setOnClickListener(v->requestLocation()); loc.addView(set,new LinearLayout.LayoutParams(dp(86),dp(42)));
-        content.addView(loc,new LinearLayout.LayoutParams(-1,-2));
-
-        TextView sec=h2("Explore food"); add(sec,18,8);
-        LinearLayout tiles=new LinearLayout(this); tiles.setGravity(Gravity.CENTER); String[][] cats={{"🍛","Meals","Popular"},{"🍕","Fast food","Quick"},{"🥤","Drinks","Cool"},{"🍰","Dessert","Sweet"}};
-        for(String[] c:cats){ LinearLayout tile=new LinearLayout(this); tile.setOrientation(LinearLayout.VERTICAL); tile.setGravity(Gravity.CENTER); tile.setPadding(dp(7),dp(9),dp(7),dp(9)); tile.setBackground(shape(SURFACE,18)); tile.setElevation(dp(1)); TextView ic=tv(c[0],23,INK); ic.setGravity(Gravity.CENTER); tile.addView(ic,new LinearLayout.LayoutParams(-1,dp(31))); TextView nm=tv(c[1],11,INK); nm.setGravity(Gravity.CENTER); nm.setTypeface(Typeface.DEFAULT,Typeface.BOLD); tile.addView(nm); LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(0,dp(76),1); tp.setMargins(dp(3),0,dp(3),0); tiles.addView(tile,tp); }
-        content.addView(tiles);
-
-        LinearLayout rh=new LinearLayout(this); rh.setGravity(Gravity.CENTER_VERTICAL); TextView rt=h2("Restaurants near you"); rh.addView(rt,new LinearLayout.LayoutParams(0,-2,1)); TextView all=tv("See all  ›",13,PRIMARY); all.setTypeface(Typeface.DEFAULT,Typeface.BOLD); rh.addView(all); content.addView(rh,new LinearLayout.LayoutParams(-1,-2));
-        loadRestaurants();
-
-        LinearLayout quick=new LinearLayout(this); quick.setGravity(Gravity.CENTER); quick.setPadding(0,dp(12),0,0);
-        TextView orders=tv("📦\nOrders",12,INK); orders.setGravity(Gravity.CENTER); orders.setTypeface(Typeface.DEFAULT,Typeface.BOLD); orders.setOnClickListener(v->showOrders());
-        TextView notices=tv("🔔\nAlerts",12,INK); notices.setGravity(Gravity.CENTER); notices.setTypeface(Typeface.DEFAULT,Typeface.BOLD); notices.setOnClickListener(v->showNotifications());
-        TextView partner=tv("🤝\nPartner",12,INK); partner.setGravity(Gravity.CENTER); partner.setTypeface(Typeface.DEFAULT,Typeface.BOLD); partner.setOnClickListener(v->showPartner());
-        quick.addView(orders,new LinearLayout.LayoutParams(0,dp(62),1)); quick.addView(notices,new LinearLayout.LayoutParams(0,dp(62),1)); quick.addView(partner,new LinearLayout.LayoutParams(0,dp(62),1)); content.addView(quick);
+        ProfessionalHomeUi.render(this, api, lat, new ProfessionalHomeUi.Actions() {
+            public void restaurant(JSONObject item) { showMenu(item); }
+            public void location() { requestLocation(); }
+            public void orders() { showOrders(); }
+            public void notifications() { showNotifications(); }
+            public void partner() { showPartner(); }
+            public void profile() { showProfile(); }
+            public void cart() { showCart(); }
+        });
     }
 
     private void loadRestaurants() {
