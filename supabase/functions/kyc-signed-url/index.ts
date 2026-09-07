@@ -1,0 +1,22 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const json=(x:unknown,s=200)=>Response.json(x,{status:s,headers:{'Cache-Control':'no-store'}});
+Deno.serve(async req=>{
+  if(req.method!=='POST')return new Response('Method Not Allowed',{status:405});
+  const token=(req.headers.get('Authorization')||'').replace(/^Bearer\s+/i,'');
+  const url=Deno.env.get('SUPABASE_URL'),anonKey=Deno.env.get('SUPABASE_ANON_KEY'),serviceKey=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if(!url||!anonKey||!serviceKey)return json({error:'Server configuration incomplete'},500);
+  const anon=createClient(url,anonKey),sb=createClient(url,serviceKey);
+  const {data:{user}}=await anon.auth.getUser(token); if(!user)return json({error:'Unauthorized'},401);
+  const b=await req.json().catch(()=>null); const id=String(b?.document_id||'');
+  if(!/^[0-9a-f-]{36}$/i.test(id))return json({error:'Invalid document id'},400);
+  const {data:doc,error}=await sb.from('kyc_documents').select('id,user_id,storage_path,status').eq('id',id).maybeSingle();
+  if(error)return json({error:error.message},500); if(!doc)return json({error:'Document not found'},404);
+  let admin=false;
+  const p=await sb.from('profiles').select('role').eq('id',user.id).maybeSingle(); admin=p.data?.role==='admin';
+  if(doc.user_id!==user.id&&!admin)return json({error:'Forbidden'},403);
+  if(!String(doc.storage_path).startsWith(`${doc.user_id}/`))return json({error:'Invalid stored path'},400);
+  const {data:signed,error:signedError}=await sb.storage.from('kyc-documents').createSignedUrl(doc.storage_path,300);
+  if(signedError)return json({error:signedError.message},500);
+  return json({url:signed.signedUrl,expires_in:300,status:doc.status});
+});
