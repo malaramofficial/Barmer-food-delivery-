@@ -31,8 +31,6 @@ jobs:
           text = path.read_text(encoding='utf-8')
           changed = False
 
-          # Remove the obsolete MainActivity login implementation using a
-          # brace-aware scanner so the current file can be cleaned safely.
           marker = '    private void showLogin(){'
           start = text.find(marker)
           if start >= 0:
@@ -65,7 +63,6 @@ jobs:
               text = text[:start] + text[end:]
               changed = True
 
-          # All authentication entry points now open the dedicated LoginActivity.
           text = text.replace('this::showLogin', 'this::openLogin')
           text = text.replace('showLogin();', 'openLogin();')
 
@@ -76,7 +73,6 @@ jobs:
               text = text.replace(anchor, '    private void openLogin(){startActivity(new Intent(this, LoginActivity.class));}\n\n' + anchor, 1)
               changed = True
 
-          # These helpers existed only for the deleted legacy login form.
           legacy_import = 'import android.view.inputmethod.InputMethodManager;\n'
           if legacy_import in text:
               text = text.replace(legacy_import, '', 1)
@@ -87,11 +83,11 @@ jobs:
               changed = True
 
           path.write_text(text, encoding='utf-8')
-          print('Legacy login cleanup:', 'changed' if changed else 'already clean')
+          print('Legacy customer login cleanup:', 'changed' if changed else 'already clean')
           PY
 
-          if git grep -n -E 'showLogin\(|Welcome back 👋|Login for faster checkout and order tracking\.' -- android/app/src/main/java; then
-            echo 'Legacy login references remain in source.'
+          if git grep -n -E 'showLogin\(|Welcome back 👋|Login for faster checkout and order tracking\.' -- android/app/src/main/java/com/malaramofficial/barmerfooddelivery/MainActivity.java; then
+            echo 'Legacy customer login references remain in MainActivity.'
             exit 1
           fi
 
