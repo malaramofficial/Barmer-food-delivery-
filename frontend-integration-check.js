@@ -26,4 +26,17 @@
     return stop;
   }
   window.BFD_REALTIME_TRACKING={start,stop};
+  const originalTrack=window.bfdLiveTrack;
+  if(typeof originalTrack==='function'){
+    window.bfdLiveTrack=async function(orderId){
+      stop();
+      await originalTrack(orderId);
+      if(window.BFD_REALTIME_TRACKING?.start){
+        window.BFD_REALTIME_TRACKING.start(orderId,(data)=>{
+          const map=document.querySelector('.map');
+          if(map && window.BFD_TRACKING_MAP?.render) window.BFD_TRACKING_MAP.render(map,data);
+        });
+      }
+    };
+  }
 })();
