@@ -14,29 +14,14 @@ create table if not exists public.menu_items(id uuid primary key default gen_ran
 create table if not exists public.orders(id uuid primary key default gen_random_uuid(),customer_id uuid not null references auth.users(id) on delete restrict,restaurant_id uuid not null references public.restaurants(id) on delete restrict,rider_id uuid references auth.users(id) on delete set null,status public.order_status not null default 'placed',delivery_address text not null,delivery_latitude double precision,delivery_longitude double precision,subtotal numeric(10,2) not null,delivery_fee numeric(10,2) not null default 0,total numeric(10,2) not null,payment_method text not null default 'cod',created_at timestamptz not null default now(),accepted_at timestamptz,picked_up_at timestamptz,delivered_at timestamptz);
 create table if not exists public.order_items(id uuid primary key default gen_random_uuid(),order_id uuid not null references public.orders(id) on delete cascade,menu_item_id uuid references public.menu_items(id) on delete set null,item_name text not null,quantity int not null check(quantity>0),unit_price numeric(10,2) not null);
 create table if not exists public.rider_locations(rider_id uuid primary key references auth.users(id) on delete cascade,latitude double precision not null,longitude double precision not null,accuracy_m double precision,heading double precision,is_online boolean not null default false,updated_at timestamptz not null default now());
+create table if not exists public.rider_order_rejections(id uuid primary key default gen_random_uuid(),rider_id uuid not null references auth.users(id) on delete cascade,order_id uuid not null references public.orders(id) on delete cascade,created_at timestamptz not null default now(),unique(rider_id,order_id));
 create table if not exists public.notifications(id uuid primary key default gen_random_uuid(),user_id uuid not null references auth.users(id) on delete cascade,order_id uuid references public.orders(id) on delete cascade,type text not null default 'order',title text not null,body text not null,data jsonb not null default '{}'::jsonb,read_at timestamptz,created_at timestamptz not null default now());
 create table if not exists public.reviews(id uuid primary key default gen_random_uuid(),order_id uuid unique not null references public.orders(id) on delete cascade,customer_id uuid not null references auth.users(id) on delete cascade,restaurant_id uuid not null references public.restaurants(id) on delete cascade,rating int not null check(rating between 1 and 5),comment text,created_at timestamptz not null default now());
 
-alter table public.profiles enable row level security; alter table public.restaurant_applications enable row level security; alter table public.rider_applications enable row level security; alter table public.restaurants enable row level security; alter table public.menu_categories enable row level security; alter table public.menu_items enable row level security; alter table public.orders enable row level security; alter table public.order_items enable row level security; alter table public.rider_locations enable row level security; alter table public.notifications enable row level security; alter table public.reviews enable row level security;
+alter table public.profiles enable row level security; alter table public.restaurant_applications enable row level security; alter table public.rider_applications enable row level security; alter table public.restaurants enable row level security; alter table public.menu_categories enable row level security; alter table public.menu_items enable row level security; alter table public.orders enable row level security; alter table public.order_items enable row level security; alter table public.rider_locations enable row level security; alter table public.rider_order_rejections enable row level security; alter table public.notifications enable row level security; alter table public.reviews enable row level security;
 
--- Idempotent policies: safe to re-run this schema during setup/migrations.
 do $$ begin
-  drop policy if exists "public approved restaurants" on public.restaurants;
-  drop policy if exists "public menus of approved restaurants" on public.menu_items;
-  drop policy if exists "public menu categories of approved restaurants" on public.menu_categories;
-  drop policy if exists "users read own profile" on public.profiles;
-  drop policy if exists "users update own profile" on public.profiles;
-  drop policy if exists "users create restaurant application" on public.restaurant_applications;
-  drop policy if exists "users read own restaurant application" on public.restaurant_applications;
-  drop policy if exists "users create rider application" on public.rider_applications;
-  drop policy if exists "users read own rider application" on public.rider_applications;
-  drop policy if exists "customers read own orders" on public.orders;
-  drop policy if exists "customers create own orders" on public.orders;
-  drop policy if exists "customers read own order items" on public.order_items;
-  drop policy if exists "users read own notifications" on public.notifications;
-  drop policy if exists "users update own notifications" on public.notifications;
-  drop policy if exists "customers read own reviews" on public.reviews;
-  drop policy if exists "customers create own reviews" on public.reviews;
+ drop policy if exists "public approved restaurants" on public.restaurants; drop policy if exists "public menus of approved restaurants" on public.menu_items; drop policy if exists "public menu categories of approved restaurants" on public.menu_categories; drop policy if exists "users read own profile" on public.profiles; drop policy if exists "users update own profile" on public.profiles; drop policy if exists "users create restaurant application" on public.restaurant_applications; drop policy if exists "users read own restaurant application" on public.restaurant_applications; drop policy if exists "users create rider application" on public.rider_applications; drop policy if exists "users read own rider application" on public.rider_applications; drop policy if exists "customers read own orders" on public.orders; drop policy if exists "customers create own orders" on public.orders; drop policy if exists "customers read own order items" on public.order_items; drop policy if exists "riders read own rejections" on public.rider_order_rejections; drop policy if exists "riders create own rejections" on public.rider_order_rejections; drop policy if exists "users read own notifications" on public.notifications; drop policy if exists "users update own notifications" on public.notifications; drop policy if exists "customers read own reviews" on public.reviews; drop policy if exists "customers create own reviews" on public.reviews;
 end $$;
 
 create policy "public approved restaurants" on public.restaurants for select using (is_approved=true);
@@ -51,22 +36,16 @@ create policy "users read own rider application" on public.rider_applications fo
 create policy "customers read own orders" on public.orders for select using (auth.uid()=customer_id or auth.uid()=rider_id or exists(select 1 from public.restaurants r where r.id=restaurant_id and r.owner_id=auth.uid()));
 create policy "customers create own orders" on public.orders for insert with check (auth.uid()=customer_id);
 create policy "customers read own order items" on public.order_items for select using (exists(select 1 from public.orders o where o.id=order_id and (o.customer_id=auth.uid() or o.rider_id=auth.uid() or exists(select 1 from public.restaurants r where r.id=o.restaurant_id and r.owner_id=auth.uid()))));
+create policy "riders read own rejections" on public.rider_order_rejections for select using (auth.uid()=rider_id);
+create policy "riders create own rejections" on public.rider_order_rejections for insert with check (auth.uid()=rider_id);
 create policy "users read own notifications" on public.notifications for select using (auth.uid()=user_id);
 create policy "users update own notifications" on public.notifications for update using (auth.uid()=user_id) with check (auth.uid()=user_id);
 create policy "customers read own reviews" on public.reviews for select using (auth.uid()=customer_id);
 create policy "customers create own reviews" on public.reviews for insert with check (auth.uid()=customer_id);
 
--- Enable Supabase Realtime for the client-facing live order/notification/location streams.
-do $$ begin
-  alter publication supabase_realtime add table public.orders;
-exception when duplicate_object then null; end $$;
-do $$ begin
-  alter publication supabase_realtime add table public.notifications;
-exception when duplicate_object then null; end $$;
-do $$ begin
-  alter publication supabase_realtime add table public.rider_locations;
-exception when duplicate_object then null; end $$;
+do $$ begin alter publication supabase_realtime add table public.orders; exception when duplicate_object then null; end $$;
+do $$ begin alter publication supabase_realtime add table public.notifications; exception when duplicate_object then null; end $$;
+do $$ begin alter publication supabase_realtime add table public.rider_locations; exception when duplicate_object then null; end $$;
 
--- Production must still add server-side Barmer geofencing, storage/KYC access controls,
--- payment verification/webhooks, push delivery credentials, and complete deployment tests.
+-- Production must still add server-side Barmer geofencing, storage/KYC access controls, payment verification/webhooks, push delivery credentials, and complete deployment tests.
 -- Never trust a client-provided role, approval flag, rider assignment, price or admin decision.
