@@ -6,13 +6,14 @@ on:
     paths:
       - 'android/**'
       - '.github/workflows/android-build.yml'
+      - 'tools/apply_professional_ui.py'
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       actions: write
     env:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -22,6 +23,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Apply professional customer UI
+        run: |
+          python3 tools/apply_professional_ui.py
+          if ! git diff --quiet -- android/app/src/main/java/com/malaramofficial/barmerfooddelivery/MainActivity.java; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add android/app/src/main/java/com/malaramofficial/barmerfooddelivery/MainActivity.java
+            git commit -m "feat: apply professional customer home UI"
+            git push
+          fi
       - name: Validate required Supabase configuration
         run: |
           test -n "$SUPABASE_URL" || { echo "SUPABASE_URL is missing"; exit 1; }
