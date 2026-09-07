@@ -9,20 +9,21 @@ import androidx.credentials.GetCredentialRequest;
 import androidx.credentials.exceptions.GetCredentialException;
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption;
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential;
-import org.json.JSONObject;
 import java.util.concurrent.Executor;
 
-/** Native Google Identity sign-in. The ID token is exchanged with Supabase Auth. */
+/** Native Google sign-in. Google credential -> Firebase Auth -> Firebase JWT -> Supabase. */
 public final class GoogleAuth {
     public interface Callback { void ok(); void error(String message); }
     private final Context context;
     private final CredentialManager manager;
     private final Executor executor;
+    private final FirebaseAuthManager firebase;
 
     public GoogleAuth(Context context) {
-        this.context = context;
+        this.context = context.getApplicationContext();
         this.manager = CredentialManager.create(context);
         this.executor = context.getMainExecutor();
+        this.firebase = new FirebaseAuthManager(context);
     }
 
     public void signIn(Activity activity, NativeApi api, Callback callback) {
@@ -31,12 +32,12 @@ public final class GoogleAuth {
             callback.error("Google Sign-In अभी configure नहीं है. GOOGLE_WEB_CLIENT_ID जोड़ें.");
             return;
         }
+        if (!firebase.configured()) {
+            callback.error("Firebase Auth configure नहीं है। Firebase project की Android configuration जोड़ें।");
+            return;
+        }
 
-        // This is the explicit Sign in with Google button flow. Unlike the
-        // generic credential query, it can prompt the user to add/select a
-        // Google account instead of immediately returning No credentials available.
-        GetSignInWithGoogleOption option = new GetSignInWithGoogleOption.Builder(clientId)
-                .build();
+        GetSignInWithGoogleOption option = new GetSignInWithGoogleOption.Builder(clientId).build();
         GetCredentialRequest request = new GetCredentialRequest.Builder()
                 .addCredentialOption(option)
                 .build();
@@ -54,17 +55,18 @@ public final class GoogleAuth {
                                 callback.error("Unsupported Google credential"); return;
                             }
                             GoogleIdTokenCredential google = GoogleIdTokenCredential.createFrom(custom.getData());
-                            JSONObject body = new JSONObject();
-                            body.put("provider", "google");
-                            body.put("id_token", google.getIdToken());
-                            api.signInWithIdToken(body, new NativeApi.Callback() {
-                                @Override public void ok(JSONObject data) { callback.ok(); }
+                            firebase.signInWithGoogleIdToken(google.getIdToken(), new FirebaseAuthManager.Callback() {
+                                @Override public void ok(String firebaseToken) {
+                                    api.setFirebaseSession(firebaseToken);
+                                    callback.ok();
+                                }
                                 @Override public void error(String message) { callback.error(message); }
                             });
                         } catch (Exception e) {
                             callback.error(e.getMessage() == null ? "Google Sign-In failed" : e.getMessage());
                         }
                     }
+
                     @Override public void onError(GetCredentialException e) {
                         String message = e.getMessage();
                         if (e instanceof androidx.credentials.exceptions.NoCredentialException) {
