@@ -8,14 +8,21 @@ android {
         applicationId 'com.malaramofficial.barmerfooddelivery'
         minSdk 23
         targetSdk 35
-        versionCode 2
-        versionName '1.1.0'
+        versionCode 3
+        versionName '1.2.0'
         buildConfigField 'String', 'SUPABASE_URL', '"' + (project.findProperty('SUPABASE_URL') ?: System.getenv('SUPABASE_URL') ?: '') + '"'
         buildConfigField 'String', 'SUPABASE_ANON_KEY', '"' + (project.findProperty('SUPABASE_ANON_KEY') ?: System.getenv('SUPABASE_ANON_KEY') ?: '') + '"'
         buildConfigField 'String', 'MAPS_API_KEY', '"' + (project.findProperty('MAPS_API_KEY') ?: System.getenv('MAPS_API_KEY') ?: '') + '"'
+        buildConfigField 'String', 'GOOGLE_WEB_CLIENT_ID', '"' + (project.findProperty('GOOGLE_WEB_CLIENT_ID') ?: System.getenv('GOOGLE_WEB_CLIENT_ID') ?: '') + '"'
     }
 
     buildFeatures { buildConfig true }
+
+    dependencies {
+        implementation 'androidx.credentials:credentials:1.5.0'
+        implementation 'androidx.credentials:credentials-play-services-auth:1.5.0'
+        implementation 'com.google.android.libraries.identity.googleid:googleid:1.1.1'
+    }
 
     buildTypes {
         release {
