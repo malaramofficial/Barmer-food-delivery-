@@ -1,0 +1,24 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const cors={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization, x-client-info, apikey, content-type'};
+const json=(b:unknown,s=200)=>new Response(JSON.stringify(b),{status:s,headers:{...cors,'Content-Type':'application/json'}});
+const R=6371;
+const km=(a:number,b:number,c:number,d:number)=>{const x=(c-a)*Math.PI/180,y=(d-b)*Math.PI/180;const q=Math.sin(x/2)**2+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(y/2)**2;return 2*R*Math.asin(Math.sqrt(q));};
+Deno.serve(async req=>{
+ if(req.method==='OPTIONS')return new Response('ok',{headers:cors});
+ if(req.method!=='POST')return json({error:'Method not allowed'},405);
+ const service=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+ const auth=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_ANON_KEY')!,{global:{headers:{Authorization:req.headers.get('Authorization')??''}}});
+ const {data:{user}}=await auth.auth.getUser(); if(!user)return json({error:'Authentication required'},401);
+ const {data:profile}=await service.from('profiles').select('role').eq('id',user.id).single();
+ if(profile?.role!=='rider')return json({error:'Approved rider only'},403);
+ const {data:approved}=await service.from('rider_applications').select('id').eq('applicant_id',user.id).eq('status','approved').limit(1);
+ if(!approved?.length)return json({error:'Rider approval required'},403);
+ const {data:loc}=await service.from('rider_locations').select('latitude,longitude,is_online,updated_at').eq('rider_id',user.id).maybeSingle();
+ if(!loc?.is_online||!loc.latitude||!loc.longitude)return json({jobs:[],reason:'Rider is offline or location is unavailable'});
+ if(Date.now()-new Date(loc.updated_at).getTime()>2*60*1000)return json({jobs:[],reason:'Rider location is stale'});
+ const {data:orders,error}=await service.from('orders').select('id,restaurant_id,status,total,delivery_fee,created_at,restaurants(id,name,address,area,latitude,longitude,is_approved)').eq('status','ready_for_pickup').is('rider_id',null);
+ if(error)return json({error:error.message},500);
+ const jobs=(orders??[]).filter((o:any)=>o.restaurants?.is_approved&&Number.isFinite(o.restaurants.latitude)&&Number.isFinite(o.restaurants.longitude)).map((o:any)=>({...o,restaurant:{id:o.restaurants.id,name:o.restaurants.name,address:o.restaurants.address,area:o.restaurants.area},distance_km:km(loc.latitude,loc.longitude,o.restaurants.latitude,o.restaurants.longitude)})).filter((o:any)=>o.distance_km<=15).sort((a:any,b:any)=>a.distance_km-b.distance_km).slice(0,20);
+ return json({jobs,generated_at:new Date().toISOString()});
+});
