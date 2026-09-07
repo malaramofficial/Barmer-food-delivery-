@@ -1,4 +1,7 @@
-plugins { id 'com.android.application' }
+plugins {
+    id 'com.android.application'
+    id 'com.google.gms.google-services'
+}
 
 android {
     namespace 'com.malaramofficial.barmerfooddelivery'
@@ -8,17 +11,22 @@ android {
         applicationId 'com.malaramofficial.barmerfooddelivery'
         minSdk 23
         targetSdk 35
-        versionCode 4
-        versionName '2.0.0'
+        versionCode 5
+        versionName '2.1.0'
         buildConfigField 'String', 'SUPABASE_URL', '"' + (project.findProperty('SUPABASE_URL') ?: System.getenv('SUPABASE_URL') ?: '') + '"'
         buildConfigField 'String', 'SUPABASE_ANON_KEY', '"' + (project.findProperty('SUPABASE_ANON_KEY') ?: System.getenv('SUPABASE_ANON_KEY') ?: '') + '"'
         buildConfigField 'String', 'MAPS_API_KEY', '"' + (project.findProperty('MAPS_API_KEY') ?: System.getenv('MAPS_API_KEY') ?: '') + '"'
         buildConfigField 'String', 'GOOGLE_WEB_CLIENT_ID', '"' + (project.findProperty('GOOGLE_WEB_CLIENT_ID') ?: System.getenv('GOOGLE_WEB_CLIENT_ID') ?: '') + '"'
+        buildConfigField 'String', 'FIREBASE_API_KEY', '"' + (project.findProperty('FIREBASE_API_KEY') ?: System.getenv('FIREBASE_API_KEY') ?: '') + '"'
+        buildConfigField 'String', 'FIREBASE_APP_ID', '"' + (project.findProperty('FIREBASE_APP_ID') ?: System.getenv('FIREBASE_APP_ID') ?: '') + '"'
+        buildConfigField 'String', 'FIREBASE_PROJECT_ID', '"' + (project.findProperty('FIREBASE_PROJECT_ID') ?: System.getenv('FIREBASE_PROJECT_ID') ?: '') + '"'
     }
 
     buildFeatures { buildConfig true }
 
     dependencies {
+        implementation platform('com.google.firebase:firebase-bom:34.18.0')
+        implementation 'com.google.firebase:firebase-auth'
         implementation 'androidx.credentials:credentials:1.5.0'
         implementation 'androidx.credentials:credentials-play-services-auth:1.5.0'
         implementation 'com.google.android.libraries.identity.googleid:googleid:1.1.1'
