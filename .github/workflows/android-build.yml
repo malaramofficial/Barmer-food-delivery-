@@ -43,6 +43,9 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+      - name: Report signing fingerprints
+        working-directory: android
+        run: gradle --no-daemon signingReport
       - name: Build debug APK
         working-directory: android
         run: gradle --no-daemon assembleDebug -PSUPABASE_URL="$SUPABASE_URL" -PSUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" -PMAPS_API_KEY="$MAPS_API_KEY" -PGOOGLE_WEB_CLIENT_ID="$GOOGLE_WEB_CLIENT_ID" -PFIREBASE_API_KEY="$FIREBASE_API_KEY" -PFIREBASE_APP_ID="$FIREBASE_APP_ID" -PFIREBASE_PROJECT_ID="$FIREBASE_PROJECT_ID"
