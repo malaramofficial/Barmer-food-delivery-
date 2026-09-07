@@ -55,7 +55,10 @@ public final class GoogleAuth {
                             JSONObject body = new JSONObject();
                             body.put("provider", "google");
                             body.put("id_token", google.getIdToken());
-                            api.signInWithIdToken(body, callback);
+                            api.signInWithIdToken(body, new NativeApi.Callback() {
+                                @Override public void ok(JSONObject data) { callback.ok(); }
+                                @Override public void error(String message) { callback.error(message); }
+                            });
                         } catch (Exception e) { callback.error(e.getMessage() == null ? "Google Sign-In failed" : e.getMessage()); }
                     }
                     @Override public void onError(GetCredentialException e) {
