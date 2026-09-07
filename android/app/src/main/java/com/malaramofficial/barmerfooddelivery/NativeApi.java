@@ -11,28 +11,175 @@ import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-/** Dependency-free Supabase REST/Auth client for the native Android app. */
+/** Native Supabase REST/Auth client. Client never receives a service-role secret. */
 public final class NativeApi {
     public interface Callback { void ok(JSONObject data); void error(String message); }
-    private static final String PREF="bfd_session";
-    private final SharedPreferences prefs; private final ExecutorService io=Executors.newCachedThreadPool();
-    private final String base,anon;
-    public NativeApi(Context c){prefs=c.getApplicationContext().getSharedPreferences(PREF,Context.MODE_PRIVATE);base=BuildConfig.SUPABASE_URL==null?"":BuildConfig.SUPABASE_URL.trim().replaceAll("/$","");anon=BuildConfig.SUPABASE_ANON_KEY==null?"":BuildConfig.SUPABASE_ANON_KEY.trim();}
-    public boolean configured(){return !base.isEmpty()&&!anon.isEmpty();} public String accessToken(){return prefs.getString("access_token","");} public String userId(){return prefs.getString("user_id","");} public boolean signedIn(){return !accessToken().isEmpty();} public void signOut(){prefs.edit().clear().apply();}
-    public void signIn(String e,String p,Callback cb){auth("/auth/v1/token?grant_type=password",e,p,cb);}
-    public void signUp(String e,String p,String n,String ph,Callback cb){JSONObject b=new JSONObject();try{b.put("email",e);b.put("password",p);JSONObject d=new JSONObject();d.put("full_name",n);d.put("phone",ph);b.put("data",d);}catch(Exception x){cb.error(x.getMessage());return;}request("POST","/auth/v1/signup",b,false,new Callback(){public void ok(JSONObject d){saveSession(d);cb.ok(d);}public void error(String m){cb.error(m);}});}
-    public void signInWithIdToken(JSONObject body,Callback cb){request("POST","/auth/v1/token?grant_type=id_token",body,false,new Callback(){public void ok(JSONObject d){saveSession(d);cb.ok(d);}public void error(String m){cb.error(m);}});}
-    private void auth(String path,String e,String p,Callback cb){JSONObject b=new JSONObject();try{b.put("email",e);b.put("password",p);}catch(Exception x){cb.error(x.getMessage());return;}request("POST",path,b,false,new Callback(){public void ok(JSONObject d){saveSession(d);cb.ok(d);}public void error(String m){cb.error(m);}});}
-    private void saveSession(JSONObject d){try{JSONObject u=d.optJSONObject("user");prefs.edit().putString("access_token",d.optString("access_token","")).putString("refresh_token",d.optString("refresh_token","")).putString("user_id",u==null?"":u.optString("id","")).apply();}catch(Exception ignored){}}
-    public void restaurants(Callback cb){request("GET","/rest/v1/restaurants?select=id,name,cuisine,address,area,rating,delivery_fee,is_open,latitude,longitude&is_approved=eq.true&order=name",null,true,cb);}
-    public void menu(String id,Callback cb){request("GET","/rest/v1/menu_items?select=id,name,description,price,image_url,is_available&restaurant_id=eq."+id+"&is_available=eq.true&order=name",null,true,cb);}
-    public void orders(Callback cb){request("GET","/rest/v1/orders?select=id,restaurant_id,status,delivery_address,delivery_latitude,delivery_longitude,subtotal,delivery_fee,total,payment_method,created_at&order=created_at.desc&limit=30",null,true,cb);}
-    public void notifications(Callback cb){request("GET","/rest/v1/notifications?select=id,title,body,order_id,read_at,created_at&order=created_at.desc&limit=30",null,true,cb);}
-    public void profile(Callback cb){request("GET","/rest/v1/profiles?select=id,full_name,phone,role,address&limit=1",null,true,cb);}
-    public void createOrder(String restaurantId,String address,double lat,double lng,String payment,JSONArray items,Callback cb){JSONObject b=new JSONObject();try{b.put("restaurant_id",restaurantId);b.put("address",address);b.put("latitude",lat);b.put("longitude",lng);b.put("payment_method",payment);b.put("items",items);}catch(Exception e){cb.error(e.getMessage());return;}invoke("create-order",b,cb);}
-    public void applyRestaurant(JSONObject b,Callback cb){insert("restaurant_applications",b,cb);} public void applyRider(JSONObject b,Callback cb){insert("rider_applications",b,cb);}
-    public void invoke(String fn,JSONObject body,Callback cb){request("POST","/functions/v1/"+fn,body,true,cb);}
-    private void insert(String table,JSONObject body,Callback cb){request("POST","/rest/v1/"+table,body,true,cb);}
-    private void request(String method,String path,JSONObject body,boolean auth,Callback cb){io.execute(()->{HttpURLConnection c=null;try{if(!configured()){cb.error("Supabase configuration missing");return;}c=(HttpURLConnection)new URL(base+path).openConnection();c.setRequestMethod(method);c.setConnectTimeout(15000);c.setReadTimeout(20000);c.setRequestProperty("apikey",anon);c.setRequestProperty("Accept","application/json");if(auth){String t=accessToken();if(t.isEmpty()){cb.error("Please login first");return;}c.setRequestProperty("Authorization","Bearer "+t);}if(body!=null){c.setRequestProperty("Content-Type","application/json");c.setRequestProperty("Prefer","return=representation");c.setDoOutput(true);try(OutputStream o=c.getOutputStream()){o.write(body.toString().getBytes(StandardCharsets.UTF_8));}}int code=c.getResponseCode();String s=read(code>=200&&code<300?c.getInputStream():c.getErrorStream());JSONObject out;try{out=s.trim().startsWith("[")?new JSONObject().put("data",new JSONArray(s)):new JSONObject(s);}catch(Exception e){out=new JSONObject().put("raw",s);}if(code>=200&&code<300)cb.ok(out);else cb.error(out.optString("message",out.optString("error",s.length()>300?s.substring(0,300):s)));}catch(Exception e){cb.error(e.getMessage()==null?"Network error":e.getMessage());}finally{if(c!=null)c.disconnect();}});}
-    private String read(InputStream in)throws IOException{if(in==null)return "";StringBuilder b=new StringBuilder();try(BufferedReader r=new BufferedReader(new InputStreamReader(in,StandardCharsets.UTF_8))){String l;while((l=r.readLine())!=null)b.append(l);}return b.toString();}
+    private static final String PREF = "bfd_session";
+    private final SharedPreferences prefs;
+    private final ExecutorService io = Executors.newCachedThreadPool();
+    private final String base, anon;
+
+    public NativeApi(Context c) {
+        prefs = c.getApplicationContext().getSharedPreferences(PREF, Context.MODE_PRIVATE);
+        base = BuildConfig.SUPABASE_URL == null ? "" : BuildConfig.SUPABASE_URL.trim().replaceAll("/$", "");
+        anon = BuildConfig.SUPABASE_ANON_KEY == null ? "" : BuildConfig.SUPABASE_ANON_KEY.trim();
+    }
+
+    public boolean configured() { return !base.isEmpty() && !anon.isEmpty(); }
+    public String accessToken() { return prefs.getString("access_token", ""); }
+    public String refreshToken() { return prefs.getString("refresh_token", ""); }
+    public String userId() { return prefs.getString("user_id", ""); }
+    public boolean signedIn() { return !accessToken().isEmpty(); }
+    public String configurationStatus() {
+        if (base.isEmpty() && anon.isEmpty()) return "Supabase URL और client key दोनों configure नहीं हैं।";
+        if (base.isEmpty()) return "Supabase URL configure नहीं है।";
+        if (anon.isEmpty()) return "Supabase client key configure नहीं है।";
+        return "Backend configuration ready";
+    }
+    public void signOut() { prefs.edit().clear().apply(); }
+
+    public void signIn(String e, String p, Callback cb) {
+        JSONObject b = new JSONObject();
+        try { b.put("email", e); b.put("password", p); }
+        catch (Exception x) { cb.error(x.getMessage()); return; }
+        request("POST", "/auth/v1/token?grant_type=password", b, false, cb, true);
+    }
+
+    public void signUp(String e, String p, String n, String ph, Callback cb) {
+        JSONObject b = new JSONObject();
+        try {
+            b.put("email", e); b.put("password", p);
+            JSONObject d = new JSONObject(); d.put("full_name", n); d.put("phone", ph); b.put("data", d);
+        } catch (Exception x) { cb.error(x.getMessage()); return; }
+        request("POST", "/auth/v1/signup", b, false, new Callback() {
+            public void ok(JSONObject d) {
+                saveSession(d);
+                if (accessToken().isEmpty()) cb.ok(new JSONObject().put("needs_email_verification", true));
+                else cb.ok(d);
+            }
+            public void error(String m) { cb.error(m); }
+        }, false);
+    }
+
+    public void signInWithIdToken(JSONObject body, Callback cb) {
+        request("POST", "/auth/v1/token?grant_type=id_token", body, false, new Callback() {
+            public void ok(JSONObject d) { saveSession(d); cb.ok(d); }
+            public void error(String m) { cb.error(m); }
+        }, true);
+    }
+
+    private void saveSession(JSONObject d) {
+        try {
+            JSONObject u = d.optJSONObject("user");
+            String token = d.optString("access_token", "");
+            String refresh = d.optString("refresh_token", "");
+            String id = u == null ? "" : u.optString("id", "");
+            SharedPreferences.Editor e = prefs.edit();
+            if (!token.isEmpty()) e.putString("access_token", token);
+            if (!refresh.isEmpty()) e.putString("refresh_token", refresh);
+            if (!id.isEmpty()) e.putString("user_id", id);
+            e.apply();
+        } catch (Exception ignored) {}
+    }
+
+    private void refreshSession(Callback cb) {
+        String rt = refreshToken();
+        if (rt.isEmpty()) { cb.error("Session expired. Please login again."); return; }
+        JSONObject b = new JSONObject();
+        try { b.put("refresh_token", rt); }
+        catch (Exception x) { cb.error(x.getMessage()); return; }
+        request("POST", "/auth/v1/token?grant_type=refresh_token", b, false, new Callback() {
+            public void ok(JSONObject d) { saveSession(d); cb.ok(d); }
+            public void error(String m) { signOut(); cb.error("Session expired. Please login again."); }
+        }, false);
+    }
+
+    public void restaurants(Callback cb) {
+        request("GET", "/rest/v1/restaurants?select=id,name,cuisine,address,area,rating,delivery_fee,is_open,latitude,longitude&is_approved=eq.true&order=name", null, false, cb, false);
+    }
+    public void menu(String id, Callback cb) {
+        if (id == null || id.trim().isEmpty()) { cb.error("Restaurant id missing"); return; }
+        request("GET", "/rest/v1/menu_items?select=id,name,description,price,image_url,is_available&restaurant_id=eq." + id + "&is_available=eq.true&order=name", null, false, cb, false);
+    }
+    public void orders(Callback cb) {
+        String uid = userId();
+        request("GET", "/rest/v1/orders?select=id,restaurant_id,status,delivery_address,delivery_latitude,delivery_longitude,subtotal,delivery_fee,total,payment_method,created_at&customer_id=eq." + uid + "&order=created_at.desc&limit=30", null, true, cb, true);
+    }
+    public void notifications(Callback cb) {
+        String uid = userId();
+        request("GET", "/rest/v1/notifications?select=id,title,body,order_id,read_at,created_at&user_id=eq." + uid + "&order=created_at.desc&limit=30", null, true, cb, true);
+    }
+    public void profile(Callback cb) {
+        String uid = userId();
+        if (uid.isEmpty()) { cb.error("Please login first"); return; }
+        request("GET", "/rest/v1/profiles?select=id,full_name,phone,role,address&id=eq." + uid + "&limit=1", null, true, cb, true);
+    }
+    public void createOrder(String restaurantId, String address, double lat, double lng, String payment, JSONArray items, Callback cb) {
+        JSONObject b = new JSONObject();
+        try {
+            b.put("restaurant_id", restaurantId); b.put("address", address); b.put("latitude", lat); b.put("longitude", lng);
+            b.put("payment_method", payment); b.put("items", items);
+        } catch (Exception e) { cb.error(e.getMessage()); return; }
+        invoke("create-order", b, cb);
+    }
+    public void applyRestaurant(JSONObject b, Callback cb) { insert("restaurant_applications", b, cb); }
+    public void applyRider(JSONObject b, Callback cb) { insert("rider_applications", b, cb); }
+    public void invoke(String fn, JSONObject body, Callback cb) { request("POST", "/functions/v1/" + fn, body, true, cb, true); }
+    private void insert(String table, JSONObject body, Callback cb) { request("POST", "/rest/v1/" + table, body, true, cb, true); }
+
+    private void request(String method, String path, JSONObject body, boolean auth, Callback cb, boolean retryOn401) {
+        io.execute(() -> {
+            if (!configured()) { cb.error("BACKEND_NOT_CONFIGURED: " + configurationStatus()); return; }
+            if (auth && accessToken().isEmpty()) { cb.error("Please login first"); return; }
+            requestOnce(method, path, body, auth, retryOn401, cb);
+        });
+    }
+
+    private void requestOnce(String method, String path, JSONObject body, boolean auth, boolean retryOn401, Callback cb) {
+        HttpURLConnection c = null;
+        try {
+            c = (HttpURLConnection) new URL(base + path).openConnection();
+            c.setRequestMethod(method); c.setConnectTimeout(15000); c.setReadTimeout(20000);
+            c.setRequestProperty("apikey", anon); c.setRequestProperty("Accept", "application/json");
+            if (auth) c.setRequestProperty("Authorization", "Bearer " + accessToken());
+            if (body != null) {
+                c.setRequestProperty("Content-Type", "application/json"); c.setRequestProperty("Prefer", "return=representation"); c.setDoOutput(true);
+                try (OutputStream o = c.getOutputStream()) { o.write(body.toString().getBytes(StandardCharsets.UTF_8)); }
+            }
+            int code = c.getResponseCode();
+            String s = read(code >= 200 && code < 300 ? c.getInputStream() : c.getErrorStream());
+            if (code == 401 && auth && retryOn401 && !refreshToken().isEmpty()) {
+                refreshSession(new Callback() {
+                    public void ok(JSONObject d) { requestOnce(method, path, body, true, false, cb); }
+                    public void error(String m) { cb.error(m); }
+                });
+                return;
+            }
+            JSONObject out;
+            try {
+                if (s.trim().startsWith("[")) out = new JSONObject().put("data", new JSONArray(s));
+                else if (s.trim().isEmpty()) out = new JSONObject();
+                else out = new JSONObject(s);
+            } catch (Exception e) { out = new JSONObject().put("raw", s); }
+            if (code >= 200 && code < 300) cb.ok(out);
+            else cb.error(errorMessage(code, out, s));
+        } catch (Exception e) {
+            cb.error(e.getMessage() == null ? "Network error" : e.getMessage());
+        } finally { if (c != null) c.disconnect(); }
+    }
+
+    private String errorMessage(int code, JSONObject out, String raw) {
+        String m = out.optString("message", out.optString("error_description", out.optString("error", "")));
+        if (m.isEmpty()) m = raw;
+        if (m == null || m.isEmpty()) m = "Request failed (HTTP " + code + ")";
+        return m.length() > 300 ? m.substring(0, 300) : m;
+    }
+    private String read(InputStream in) throws IOException {
+        if (in == null) return "";
+        StringBuilder b = new StringBuilder();
+        try (BufferedReader r = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
+            String l; while ((l = r.readLine()) != null) b.append(l);
+        }
+        return b.toString();
+    }
 }
