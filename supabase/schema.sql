@@ -1,10 +1,8 @@
 -- Barmer Food Delivery production schema
 create extension if not exists pgcrypto;
-
 do $$ begin create type public.app_role as enum ('customer','restaurant','rider','admin'); exception when duplicate_object then null; end $$;
 do $$ begin create type public.application_status as enum ('pending','approved','rejected','suspended'); exception when duplicate_object then null; end $$;
 do $$ begin create type public.order_status as enum ('placed','restaurant_notified','accepted','preparing','ready_for_pickup','rider_assigned','picked_up','on_the_way','delivered','cancelled'); exception when duplicate_object then null; end $$;
-
 create table if not exists public.profiles(id uuid primary key references auth.users(id) on delete cascade,full_name text not null,phone text unique,role public.app_role not null default 'customer',avatar_url text,address text,created_at timestamptz not null default now(),updated_at timestamptz not null default now());
 create table if not exists public.restaurant_applications(id uuid primary key default gen_random_uuid(),applicant_id uuid references auth.users(id) on delete set null,restaurant_name text not null,owner_name text not null,phone text not null,address text not null,barmer_area text not null,registration_no text,status public.application_status not null default 'pending',admin_note text,reviewed_by uuid references auth.users(id) on delete set null,reviewed_at timestamptz);
 create table if not exists public.rider_applications(id uuid primary key default gen_random_uuid(),applicant_id uuid references auth.users(id) on delete set null,full_name text not null,phone text not null,address text not null,vehicle_no text,licence_no text,emergency_contact text,status public.application_status not null default 'pending',admin_note text,reviewed_by uuid references auth.users(id) on delete set null,reviewed_at timestamptz);
@@ -23,29 +21,19 @@ alter table public.profiles enable row level security; alter table public.restau
 do $$ begin
  drop policy if exists "public approved restaurants" on public.restaurants; drop policy if exists "public menus of approved restaurants" on public.menu_items; drop policy if exists "public menu categories of approved restaurants" on public.menu_categories; drop policy if exists "users read own profile" on public.profiles; drop policy if exists "users update own profile" on public.profiles; drop policy if exists "users create restaurant application" on public.restaurant_applications; drop policy if exists "users read own restaurant application" on public.restaurant_applications; drop policy if exists "users create rider application" on public.rider_applications; drop policy if exists "users read own rider application" on public.rider_applications; drop policy if exists "customers read own orders" on public.orders; drop policy if exists "customers create own orders" on public.orders; drop policy if exists "customers read own order items" on public.order_items; drop policy if exists "riders read own rejections" on public.rider_order_rejections; drop policy if exists "riders create own rejections" on public.rider_order_rejections; drop policy if exists "users read own notifications" on public.notifications; drop policy if exists "users update own notifications" on public.notifications; drop policy if exists "customers read own reviews" on public.reviews; drop policy if exists "customers create own reviews" on public.reviews;
 end $$;
-
 create policy "public approved restaurants" on public.restaurants for select using (is_approved=true);
 create policy "public menus of approved restaurants" on public.menu_items for select using (exists(select 1 from public.restaurants r where r.id=restaurant_id and r.is_approved=true));
 create policy "public menu categories of approved restaurants" on public.menu_categories for select using (exists(select 1 from public.restaurants r where r.id=restaurant_id and r.is_approved=true));
-create policy "users read own profile" on public.profiles for select using (auth.uid()=id);
-create policy "users update own profile" on public.profiles for update using (auth.uid()=id) with check (auth.uid()=id);
-create policy "users create restaurant application" on public.restaurant_applications for insert with check (auth.uid()=applicant_id);
-create policy "users read own restaurant application" on public.restaurant_applications for select using (auth.uid()=applicant_id);
-create policy "users create rider application" on public.rider_applications for insert with check (auth.uid()=applicant_id);
-create policy "users read own rider application" on public.rider_applications for select using (auth.uid()=applicant_id);
-create policy "customers read own orders" on public.orders for select using (auth.uid()=customer_id or auth.uid()=rider_id or exists(select 1 from public.restaurants r where r.id=restaurant_id and r.owner_id=auth.uid()));
-create policy "customers create own orders" on public.orders for insert with check (auth.uid()=customer_id);
+create policy "users read own profile" on public.profiles for select using (auth.uid()=id); create policy "users update own profile" on public.profiles for update using (auth.uid()=id) with check (auth.uid()=id);
+create policy "users create restaurant application" on public.restaurant_applications for insert with check (auth.uid()=applicant_id); create policy "users read own restaurant application" on public.restaurant_applications for select using (auth.uid()=applicant_id);
+create policy "users create rider application" on public.rider_applications for insert with check (auth.uid()=applicant_id); create policy "users read own rider application" on public.rider_applications for select using (auth.uid()=applicant_id);
+create policy "customers read own orders" on public.orders for select using (auth.uid()=customer_id or auth.uid()=rider_id or exists(select 1 from public.restaurants r where r.id=restaurant_id and r.owner_id=auth.uid())); create policy "customers create own orders" on public.orders for insert with check (auth.uid()=customer_id);
 create policy "customers read own order items" on public.order_items for select using (exists(select 1 from public.orders o where o.id=order_id and (o.customer_id=auth.uid() or o.rider_id=auth.uid() or exists(select 1 from public.restaurants r where r.id=o.restaurant_id and r.owner_id=auth.uid()))));
-create policy "riders read own rejections" on public.rider_order_rejections for select using (auth.uid()=rider_id);
-create policy "riders create own rejections" on public.rider_order_rejections for insert with check (auth.uid()=rider_id);
-create policy "users read own notifications" on public.notifications for select using (auth.uid()=user_id);
-create policy "users update own notifications" on public.notifications for update using (auth.uid()=user_id) with check (auth.uid()=user_id);
-create policy "customers read own reviews" on public.reviews for select using (auth.uid()=customer_id);
-create policy "customers create own reviews" on public.reviews for insert with check (auth.uid()=customer_id);
+create policy "riders read own rejections" on public.rider_order_rejections for select using (auth.uid()=rider_id); create policy "riders create own rejections" on public.rider_order_rejections for insert with check (auth.uid()=rider_id);
+create policy "users read own notifications" on public.notifications for select using (auth.uid()=user_id); create policy "users update own notifications" on public.notifications for update using (auth.uid()=user_id) with check (auth.uid()=user_id);
+create policy "customers read own reviews" on public.reviews for select using (auth.uid()=customer_id); create policy "customers create own reviews" on public.reviews for insert with check (auth.uid()=customer_id);
 
-do $$ begin alter publication supabase_realtime add table public.orders; exception when duplicate_object then null; end $$;
-do $$ begin alter publication supabase_realtime add table public.notifications; exception when duplicate_object then null; end $$;
-do $$ begin alter publication supabase_realtime add table public.rider_locations; exception when duplicate_object then null; end $$;
-
--- Production must still add server-side Barmer geofencing, storage/KYC access controls, payment verification/webhooks, push delivery credentials, and complete deployment tests.
+do $$ begin alter publication supabase_realtime add table public.orders; exception when duplicate_object then null; end $$; do $$ begin alter publication supabase_realtime add table public.notifications; exception when duplicate_object then null; end $$; do $$ begin alter publication supabase_realtime add table public.rider_locations; exception when duplicate_object then null; end $$;
+create index if not exists idx_orders_customer_created on public.orders(customer_id,created_at desc); create index if not exists idx_orders_restaurant_status on public.orders(restaurant_id,status,created_at desc); create index if not exists idx_orders_rider_status on public.orders(rider_id,status,created_at desc); create index if not exists idx_rider_locations_online_updated on public.rider_locations(is_online,updated_at desc); create index if not exists idx_notifications_user_created on public.notifications(user_id,created_at desc); create index if not exists idx_rejections_rider_order on public.rider_order_rejections(rider_id,order_id);
+-- Production service-area enforcement is also applied in Edge Functions. BFD_BARMER_RADIUS_KM defaults to 35 km around Barmer city and can be configured server-side.
 -- Never trust a client-provided role, approval flag, rider assignment, price or admin decision.
