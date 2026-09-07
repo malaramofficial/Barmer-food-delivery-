@@ -18,6 +18,7 @@ jobs:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
       MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
+      GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -36,10 +37,10 @@ jobs:
           gradle-version: '8.9'
       - name: Build debug APK
         working-directory: android
-        run: gradle --no-daemon assembleDebug -PSUPABASE_URL="$SUPABASE_URL" -PSUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" -PMAPS_API_KEY="$MAPS_API_KEY"
+        run: gradle --no-daemon assembleDebug -PSUPABASE_URL="$SUPABASE_URL" -PSUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" -PMAPS_API_KEY="$MAPS_API_KEY" -PGOOGLE_WEB_CLIENT_ID="$GOOGLE_WEB_CLIENT_ID"
       - name: Build release APK and AAB
         working-directory: android
-        run: gradle --no-daemon assembleRelease bundleRelease -PSUPABASE_URL="$SUPABASE_URL" -PSUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" -PMAPS_API_KEY="$MAPS_API_KEY"
+        run: gradle --no-daemon assembleRelease bundleRelease -PSUPABASE_URL="$SUPABASE_URL" -PSUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" -PMAPS_API_KEY="$MAPS_API_KEY" -PGOOGLE_WEB_CLIENT_ID="$GOOGLE_WEB_CLIENT_ID"
       - name: Upload Android artifacts
         uses: actions/upload-artifact@v4
         with:
