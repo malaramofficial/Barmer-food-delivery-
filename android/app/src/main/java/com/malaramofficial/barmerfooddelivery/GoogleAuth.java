@@ -7,7 +7,7 @@ import androidx.credentials.Credential;
 import androidx.credentials.CredentialManager;
 import androidx.credentials.GetCredentialRequest;
 import androidx.credentials.exceptions.GetCredentialException;
-import com.google.android.libraries.identity.googleid.GetGoogleIdOption;
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption;
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential;
 import org.json.JSONObject;
 import java.util.concurrent.Executor;
@@ -31,14 +31,16 @@ public final class GoogleAuth {
             callback.error("Google Sign-In अभी configure नहीं है. GOOGLE_WEB_CLIENT_ID जोड़ें.");
             return;
         }
-        GetGoogleIdOption option = new GetGoogleIdOption.Builder()
-                .setServerClientId(clientId)
-                .setFilterByAuthorizedAccounts(false)
-                .setAutoSelectEnabled(true)
+
+        // This is the explicit Sign in with Google button flow. Unlike the
+        // generic credential query, it can prompt the user to add/select a
+        // Google account instead of immediately returning No credentials available.
+        GetSignInWithGoogleOption option = new GetSignInWithGoogleOption.Builder(clientId)
                 .build();
         GetCredentialRequest request = new GetCredentialRequest.Builder()
                 .addCredentialOption(option)
                 .build();
+
         manager.getCredentialAsync(activity, request, new CancellationSignal(), executor,
                 new androidx.credentials.CredentialManagerCallback<androidx.credentials.GetCredentialResponse, GetCredentialException>() {
                     @Override public void onResult(androidx.credentials.GetCredentialResponse result) {
@@ -59,10 +61,17 @@ public final class GoogleAuth {
                                 @Override public void ok(JSONObject data) { callback.ok(); }
                                 @Override public void error(String message) { callback.error(message); }
                             });
-                        } catch (Exception e) { callback.error(e.getMessage() == null ? "Google Sign-In failed" : e.getMessage()); }
+                        } catch (Exception e) {
+                            callback.error(e.getMessage() == null ? "Google Sign-In failed" : e.getMessage());
+                        }
                     }
                     @Override public void onError(GetCredentialException e) {
-                        callback.error(e.getMessage() == null ? "Google Sign-In cancelled or failed" : e.getMessage());
+                        String message = e.getMessage();
+                        if (e instanceof androidx.credentials.exceptions.NoCredentialException) {
+                            callback.error("इस फोन में Google account उपलब्ध नहीं है। पहले Google account जोड़ें, फिर दोबारा कोशिश करें।");
+                        } else {
+                            callback.error(message == null ? "Google Sign-In cancelled or failed" : message);
+                        }
                     }
                 });
     }
