@@ -12,7 +12,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
       actions: write
     env:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -22,82 +22,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Remove legacy customer login code
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          path = Path('android/app/src/main/java/com/malaramofficial/barmerfooddelivery/MainActivity.java')
-          text = path.read_text(encoding='utf-8')
-          changed = False
-
-          marker = '    private void showLogin(){'
-          start = text.find(marker)
-          if start >= 0:
-              brace = text.find('{', start)
-              depth = 0
-              in_string = False
-              escaped = False
-              end = None
-              for i in range(brace, len(text)):
-                  ch = text[i]
-                  if in_string:
-                      if escaped:
-                          escaped = False
-                      elif ch == '\\':
-                          escaped = True
-                      elif ch == '"':
-                          in_string = False
-                  else:
-                      if ch == '"':
-                          in_string = True
-                      elif ch == '{':
-                          depth += 1
-                      elif ch == '}':
-                          depth -= 1
-                          if depth == 0:
-                              end = i + 1
-                              break
-              if end is None:
-                  raise SystemExit('Could not safely locate legacy showLogin() method')
-              text = text[:start] + text[end:]
-              changed = True
-
-          text = text.replace('this::showLogin', 'this::openLogin')
-          text = text.replace('showLogin();', 'openLogin();')
-
-          if 'private void openLogin()' not in text:
-              anchor = '    private void showPartner(){'
-              if anchor not in text:
-                  raise SystemExit('Could not locate insertion point for openLogin()')
-              text = text.replace(anchor, '    private void openLogin(){startActivity(new Intent(this, LoginActivity.class));}\n\n' + anchor, 1)
-              changed = True
-
-          legacy_import = 'import android.view.inputmethod.InputMethodManager;\n'
-          if legacy_import in text:
-              text = text.replace(legacy_import, '', 1)
-              changed = True
-          legacy_helper = '    private void hideKeyboard(){((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(root.getWindowToken(),0);}\n'
-          if legacy_helper in text:
-              text = text.replace(legacy_helper, '', 1)
-              changed = True
-
-          path.write_text(text, encoding='utf-8')
-          print('Legacy customer login cleanup:', 'changed' if changed else 'already clean')
-          PY
-
-          if git grep -n -E 'showLogin\(|Welcome back 👋|Login for faster checkout and order tracking\.' -- android/app/src/main/java/com/malaramofficial/barmerfooddelivery/MainActivity.java; then
-            echo 'Legacy customer login references remain in MainActivity.'
-            exit 1
-          fi
-
-          if ! git diff --quiet -- android/app/src/main/java/com/malaramofficial/barmerfooddelivery/MainActivity.java; then
-            git config user.name 'github-actions[bot]'
-            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git add android/app/src/main/java/com/malaramofficial/barmerfooddelivery/MainActivity.java
-            git commit -m 'refactor: remove obsolete MainActivity login implementation'
-            git push
-          fi
       - name: Validate required Supabase configuration
         run: |
           test -n "$SUPABASE_URL" || { echo "SUPABASE_URL is missing"; exit 1; }
