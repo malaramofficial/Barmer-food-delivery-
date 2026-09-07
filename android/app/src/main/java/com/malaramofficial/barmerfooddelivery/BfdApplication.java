@@ -3,24 +3,21 @@ package com.malaramofficial.barmerfooddelivery;
 import android.app.Activity;
 import android.app.Application;
 import android.content.Context;
-import android.content.Intent;
 import android.graphics.Typeface;
 import android.os.Bundle;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.ViewTreeObserver;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
 
-/** Native app-wide typography polish and migration guard for the legacy customer auth view. */
+/** Native app-wide typography and responsive UI polish. */
 public final class BfdApplication extends Application {
     @Override public void onCreate() {
         super.onCreate();
         registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {
             @Override public void onActivityResumed(Activity activity) {
                 polishTree(activity.getWindow().getDecorView());
-                if (activity instanceof MainActivity) watchLegacyLogin(activity);
             }
             @Override public void onActivityCreated(Activity a, Bundle b) {}
             @Override public void onActivityStarted(Activity a) {}
@@ -29,29 +26,6 @@ public final class BfdApplication extends Application {
             @Override public void onActivitySaveInstanceState(Activity a, Bundle b) {}
             @Override public void onActivityDestroyed(Activity a) {}
         });
-    }
-
-    /** The old MainActivity login method still exists for compatibility. Redirect it to the new screen. */
-    private void watchLegacyLogin(final Activity activity) {
-        final View decor = activity.getWindow().getDecorView();
-        final ViewTreeObserver observer = decor.getViewTreeObserver();
-        final ViewTreeObserver.OnGlobalLayoutListener listener = new ViewTreeObserver.OnGlobalLayoutListener() {
-            private boolean redirected;
-            @Override public void onGlobalLayout() {
-                if (redirected) return;
-                View old = findText(decor, "Welcome back 👋");
-                if (old != null) {
-                    redirected = true;
-                    if (observer.isAlive()) observer.removeOnGlobalLayoutListener(this);
-                    activity.startActivity(new Intent(activity, LoginActivity.class));
-                    activity.finish();
-                }
-            }
-        };
-        observer.addOnGlobalLayoutListener(listener);
-        decor.postDelayed(() -> {
-            if (observer.isAlive()) observer.removeOnGlobalLayoutListener(listener);
-        }, 15000);
     }
 
     private void polishTree(View view) {
@@ -80,18 +54,6 @@ public final class BfdApplication extends Application {
             ViewGroup g = (ViewGroup)view;
             for (int i = 0; i < g.getChildCount(); i++) polishTree(g.getChildAt(i));
         }
-    }
-
-    private View findText(View root, String wanted) {
-        if (root instanceof TextView && wanted.contentEquals(((TextView)root).getText())) return root;
-        if (root instanceof ViewGroup) {
-            ViewGroup g = (ViewGroup)root;
-            for (int i = 0; i < g.getChildCount(); i++) {
-                View found = findText(g.getChildAt(i), wanted);
-                if (found != null) return found;
-            }
-        }
-        return null;
     }
 
     private int dp(Context c, int n) { return (int)(n * c.getResources().getDisplayMetrics().density + .5f); }
