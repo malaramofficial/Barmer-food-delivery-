@@ -22,6 +22,10 @@ jobs:
       FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
       FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
       FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+      RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+      RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+      RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+      RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -36,7 +40,17 @@ jobs:
             *) echo "GOOGLE_WEB_CLIENT_ID must be a Google OAuth Web client ID ending in .apps.googleusercontent.com"; exit 1 ;;
           esac
           test -f android/app/google-services.json || { echo "android/app/google-services.json is missing"; exit 1; }
+          test -n "$RELEASE_KEYSTORE_BASE64" || { echo "RELEASE_KEYSTORE_BASE64 is missing — refusing to create an unsigned release."; exit 1; }
+          test -n "$RELEASE_STORE_PASSWORD" || { echo "RELEASE_STORE_PASSWORD is missing"; exit 1; }
+          test -n "$RELEASE_KEY_ALIAS" || { echo "RELEASE_KEY_ALIAS is missing"; exit 1; }
+          test -n "$RELEASE_KEY_PASSWORD" || { echo "RELEASE_KEY_PASSWORD is missing"; exit 1; }
           echo "Required CI configuration is present; Firebase native config is read from google-services.json."
+      - name: Restore permanent release keystore
+        run: |
+          printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 --decode > android/app/release-upload.jks
+          chmod 600 android/app/release-upload.jks
+          test -s android/app/release-upload.jks || { echo "Release keystore restore failed"; exit 1; }
+          echo "RELEASE_KEYSTORE_PATH=$GITHUB_WORKSPACE/android/app/release-upload.jks" >> "$GITHUB_ENV"
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
@@ -56,21 +70,22 @@ jobs:
       - name: Build debug APK
         working-directory: android
         run: gradle --no-daemon assembleDebug -PSUPABASE_URL="$SUPABASE_URL" -PSUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" -PMAPS_API_KEY="$MAPS_API_KEY" -PGOOGLE_WEB_CLIENT_ID="$GOOGLE_WEB_CLIENT_ID" -PFIREBASE_API_KEY="$FIREBASE_API_KEY" -PFIREBASE_APP_ID="$FIREBASE_APP_ID" -PFIREBASE_PROJECT_ID="$FIREBASE_PROJECT_ID"
-      - name: Build release APK and AAB
+      - name: Build signed release APK and AAB
         working-directory: android
         run: gradle --no-daemon assembleRelease bundleRelease -PSUPABASE_URL="$SUPABASE_URL" -PSUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" -PMAPS_API_KEY="$MAPS_API_KEY" -PGOOGLE_WEB_CLIENT_ID="$GOOGLE_WEB_CLIENT_ID" -PFIREBASE_API_KEY="$FIREBASE_API_KEY" -PFIREBASE_APP_ID="$FIREBASE_APP_ID" -PFIREBASE_PROJECT_ID="$FIREBASE_PROJECT_ID"
-      - name: Inspect APK signing certificates
+      - name: Verify release signatures
         run: |
-          set +e
           mkdir -p android/app/build/outputs/signing-report
           {
             echo "=== Debug APK ==="
-            "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs android/app/build/outputs/apk/debug/*.apk
+            "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs android/app/build/outputs/apk/debug/*.apk
             echo
             echo "=== Release APK ==="
-            "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs android/app/build/outputs/apk/release/*.apk
+            "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs android/app/build/outputs/apk/release/*.apk
+            echo
+            echo "=== Release AAB ==="
+            jarsigner -verify -verbose -certs android/app/build/outputs/bundle/release/*.aab
           } 2>&1 | tee android/app/build/outputs/signing-report/apk-certificates.txt
-          exit 0
       - name: Upload APK signing report
         uses: actions/upload-artifact@v4
         with:
@@ -81,13 +96,16 @@ jobs:
         with:
           name: barmer-food-delivery-v2-debug-apk
           path: android/app/build/outputs/apk/debug/*.apk
-      - name: Upload release APK
+      - name: Upload signed release APK
         uses: actions/upload-artifact@v4
         with:
-          name: barmer-food-delivery-v2-release-apk
+          name: barmer-food-delivery-v2-signed-release-apk
           path: android/app/build/outputs/apk/release/*.apk
-      - name: Upload Play Store AAB
+      - name: Upload signed Play Store AAB
         uses: actions/upload-artifact@v4
         with:
-          name: barmer-food-delivery-v2-release-aab
+          name: barmer-food-delivery-v2-signed-release-aab
           path: android/app/build/outputs/bundle/release/*.aab
+      - name: Remove restored release keystore
+        if: always()
+        run: rm -f android/app/release-upload.jks
