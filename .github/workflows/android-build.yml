@@ -59,6 +59,23 @@ jobs:
       - name: Build release APK and AAB
         working-directory: android
         run: gradle --no-daemon assembleRelease bundleRelease -PSUPABASE_URL="$SUPABASE_URL" -PSUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" -PMAPS_API_KEY="$MAPS_API_KEY" -PGOOGLE_WEB_CLIENT_ID="$GOOGLE_WEB_CLIENT_ID" -PFIREBASE_API_KEY="$FIREBASE_API_KEY" -PFIREBASE_APP_ID="$FIREBASE_APP_ID" -PFIREBASE_PROJECT_ID="$FIREBASE_PROJECT_ID"
+      - name: Inspect APK signing certificates
+        run: |
+          set +e
+          mkdir -p android/app/build/outputs/signing-report
+          {
+            echo "=== Debug APK ==="
+            "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs android/app/build/outputs/apk/debug/*.apk
+            echo
+            echo "=== Release APK ==="
+            "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs android/app/build/outputs/apk/release/*.apk
+          } 2>&1 | tee android/app/build/outputs/signing-report/apk-certificates.txt
+          exit 0
+      - name: Upload APK signing report
+        uses: actions/upload-artifact@v4
+        with:
+          name: barmer-food-delivery-v2-signing-report
+          path: android/app/build/outputs/signing-report/apk-certificates.txt
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
