@@ -12,7 +12,20 @@
           "package_name": "com.malaramofficial.barmerfooddelivery"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "282112805305-c4pc5ebf8g41d9na9ip5h6kmhnkgh3en.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.malaramofficial.barmerfooddelivery",
+            "certificate_hash": "a67bc30ab0a4d5890c6d5c96e5f6acd61a9fef10"
+          }
+        },
+        {
+          "client_id": "282112805305-n7mfga06ubcaarpokkeso8iva4nfeorg.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAyBZ4aQgqHlvek16PXCkXEQmO7fTWgRc"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "282112805305-n7mfga06ubcaarpokkeso8iva4nfeorg.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
