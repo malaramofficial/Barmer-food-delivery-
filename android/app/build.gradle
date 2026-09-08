@@ -16,7 +16,7 @@ android {
         buildConfigField 'String', 'SUPABASE_URL', '"' + (project.findProperty('SUPABASE_URL') ?: System.getenv('SUPABASE_URL') ?: '') + '"'
         buildConfigField 'String', 'SUPABASE_ANON_KEY', '"' + (project.findProperty('SUPABASE_ANON_KEY') ?: System.getenv('SUPABASE_ANON_KEY') ?: '') + '"'
         buildConfigField 'String', 'MAPS_API_KEY', '"' + (project.findProperty('MAPS_API_KEY') ?: System.getenv('MAPS_API_KEY') ?: '') + '"'
-        buildConfigField 'String', 'GOOGLE_WEB_CLIENT_ID', '"' + (project.findProperty('GOOGLE_WEB_CLIENT_ID') ?: System.getenv('GOOGLE_WEB_CLIENT_ID') ?: '') + '"'
+        buildConfigField 'String', 'GOOGLE_WEB_CLIENT_ID', '"' + (project.findProperty('GOOGLE_WEB_CLIENT_ID') ?: System.getenv('GOOGLE_WEB_CLIENT_ID') ?: '282112805305-n7mfga06ubcaarpokkeso8iva4nfeorg.apps.googleusercontent.com') + '"'
         buildConfigField 'String', 'FIREBASE_API_KEY', '"' + (project.findProperty('FIREBASE_API_KEY') ?: System.getenv('FIREBASE_API_KEY') ?: '') + '"'
         buildConfigField 'String', 'FIREBASE_APP_ID', '"' + (project.findProperty('FIREBASE_APP_ID') ?: System.getenv('FIREBASE_APP_ID') ?: '') + '"'
         buildConfigField 'String', 'FIREBASE_PROJECT_ID', '"' + (project.findProperty('FIREBASE_PROJECT_ID') ?: System.getenv('FIREBASE_PROJECT_ID') ?: '') + '"'
