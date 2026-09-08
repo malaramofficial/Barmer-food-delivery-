@@ -3,12 +3,14 @@ package com.malaramofficial.barmerfooddelivery;
 import android.app.Activity;
 import android.content.Context;
 import android.os.CancellationSignal;
+import android.util.Base64;
 import androidx.credentials.Credential;
 import androidx.credentials.CredentialManager;
 import androidx.credentials.GetCredentialRequest;
 import androidx.credentials.exceptions.GetCredentialException;
-import com.google.android.libraries.identity.googleid.GetGoogleIdOption;
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption;
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential;
+import java.security.SecureRandom;
 import java.util.concurrent.Executor;
 
 /** Native Google sign-in. Google credential -> Firebase Auth -> Firebase JWT -> Supabase. */
@@ -24,6 +26,12 @@ public final class GoogleAuth {
         this.firebase = new FirebaseAuthManager(context);
     }
 
+    private static String generateNonce() {
+        byte[] bytes = new byte[32];
+        new SecureRandom().nextBytes(bytes);
+        return Base64.encodeToString(bytes, Base64.URL_SAFE | Base64.NO_WRAP | Base64.NO_PADDING);
+    }
+
     public void signIn(Activity activity, NativeApi api, Callback callback) {
         final String clientId = BuildConfig.GOOGLE_WEB_CLIENT_ID == null ? "" : BuildConfig.GOOGLE_WEB_CLIENT_ID.trim();
         if (clientId.isEmpty()) {
@@ -35,13 +43,11 @@ public final class GoogleAuth {
             return;
         }
 
-        // Firebase's documented Android flow uses the Web/server OAuth client ID
-        // here, not the Android OAuth client ID. The installed APK's package name
-        // and signing SHA-1 must separately exist in the Google Cloud project.
-        GetGoogleIdOption option = new GetGoogleIdOption.Builder()
-                .setServerClientId(clientId)
-                .setFilterByAuthorizedAccounts(false)
-                .setAutoSelectEnabled(false)
+        // This is the explicit button flow documented by Google for Sign in with Google.
+        // It is intentionally used here because it also covers devices with no
+        // previously-authorized Google account available to Credential Manager.
+        GetSignInWithGoogleOption option = new GetSignInWithGoogleOption.Builder(clientId)
+                .setNonce(generateNonce())
                 .build();
 
         GetCredentialRequest request = new GetCredentialRequest.Builder()
@@ -77,7 +83,7 @@ public final class GoogleAuth {
                     @Override public void onError(GetCredentialException e) {
                         String message = e.getMessage();
                         if (e instanceof androidx.credentials.exceptions.NoCredentialException) {
-                            callback.error("इस फोन में Google account उपलब्ध नहीं है। पहले Google account जोड़ें, फिर दोबारा कोशिश करें।");
+                            callback.error("Google account उपलब्ध नहीं है। फोन में Google account जोड़कर फिर से Continue with Google दबाएँ।");
                         } else {
                             callback.error(message == null ? "Google Sign-In cancelled or failed" : message);
                         }
