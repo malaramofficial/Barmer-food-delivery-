@@ -7,7 +7,7 @@ import androidx.credentials.Credential;
 import androidx.credentials.CredentialManager;
 import androidx.credentials.GetCredentialRequest;
 import androidx.credentials.exceptions.GetCredentialException;
-import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption;
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption;
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential;
 import java.util.concurrent.Executor;
 
@@ -35,7 +35,15 @@ public final class GoogleAuth {
             return;
         }
 
-        GetSignInWithGoogleOption option = new GetSignInWithGoogleOption.Builder(clientId).build();
+        // Firebase's documented Android flow uses the Web/server OAuth client ID
+        // here, not the Android OAuth client ID. The installed APK's package name
+        // and signing SHA-1 must separately exist in the Google Cloud project.
+        GetGoogleIdOption option = new GetGoogleIdOption.Builder()
+                .setServerClientId(clientId)
+                .setFilterByAuthorizedAccounts(false)
+                .setAutoSelectEnabled(false)
+                .build();
+
         GetCredentialRequest request = new GetCredentialRequest.Builder()
                 .addCredentialOption(option)
                 .build();
