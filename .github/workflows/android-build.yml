@@ -35,10 +35,8 @@ jobs:
             *.apps.googleusercontent.com) ;;
             *) echo "GOOGLE_WEB_CLIENT_ID must be a Google OAuth Web client ID ending in .apps.googleusercontent.com"; exit 1 ;;
           esac
-          test -n "$FIREBASE_API_KEY" || { echo "FIREBASE_API_KEY is missing"; exit 1; }
-          test -n "$FIREBASE_APP_ID" || { echo "FIREBASE_APP_ID is missing"; exit 1; }
-          test -n "$FIREBASE_PROJECT_ID" || { echo "FIREBASE_PROJECT_ID is missing"; exit 1; }
-          echo "Required authentication configuration is present (values are not printed)."
+          test -f android/app/google-services.json || { echo "android/app/google-services.json is missing"; exit 1; }
+          echo "Required CI configuration is present; Firebase native config is read from google-services.json."
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
